@@ -20,7 +20,7 @@ All internal reasoning, keyword matching, and user-facing prompts produced by th
 ## Why three routes
 
 - **casual** exists so small talk and meta-questions don't drag through session allocation, planning, and downstream skills. A user saying "hi" or "what can you do" shouldn't create a `.planning/` directory.
-- **plan** is the normal path for work requests with enough signal to proceed — a verb, a target, and enough criteria for `complexity-classifier` to pick a tier.
+- **plan** is the normal path for work requests with enough signal to proceed — a verb, a target, and enough criteria for `brainstorming` to pick a tier without re-asking.
 - **clarify** is the release valve for requests where the user clearly wants work done but the router cannot tell *what work* without asking. The router does not ask those questions itself; `brainstorming` owns that conversation.
 
 When in doubt between **plan** and **clarify**, prefer **clarify** — one extra round-trip is cheaper than a plan built on guessed requirements.
@@ -79,9 +79,9 @@ Emit a structured classification; `harness-flow.yaml` consumes it via the `outco
 | Outcome | Next node (per harness-flow.yaml) | Payload |
 |---------|---------------------------|---------|
 | `casual` | END — router replies inline | — |
-| `clarify` | `brainstorming` | `{ request, session_id }` |
-| `plan` | `classifier` | `{ request, session_id }` |
-| `resume` | `classifier` (Step 0 short-circuits to next incomplete phase) | `{ request, session_id }` |
+| `clarify` | `brainstorming` (runs full Q&A) | `{ request, session_id, route: "clarify" }` |
+| `plan` | `brainstorming` (skips Q&A, classifies directly) | `{ request, session_id, route: "plan" }` |
+| `resume` | `brainstorming` (Step 0 short-circuits to next incomplete phase) | `{ request, session_id, route: "resume", resume: true }` |
 
 `resume` is its own outcome — not a boolean flag on `plan`. When Step 1 matches an existing session, emit `outcome: "resume"`; otherwise `plan`.
 
@@ -243,6 +243,6 @@ Keep these in sync with `harness-flow.yaml`.
 
 ## Boundaries
 
-- Do not plan, decompose, or write code here. Those belong to `complexity-classifier`, `prd-writer`, `trd-writer`, `task-writer`.
+- Do not plan, decompose, or write code here. Those belong to `brainstorming`, `prd-writer`, `trd-writer`, `task-writer`.
 - Do not ask clarifying questions beyond session-slug confirmation and multiple-match disambiguation. Any other ambiguity is for `brainstorming`.
 - Do not modify `ROADMAP.md` / `STATE.md` after creating the skeletons. Downstream skills own those files.

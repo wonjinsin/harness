@@ -1,23 +1,24 @@
 ---
 name: using-harness
-description: Harness bootstrap — you interpret `docs/harness/harness-flow.yaml` and dispatch the next node after every skill completes. `harness-flow.yaml` is the single source of truth; this skill teaches you how to read it. Loaded at session start via hook, not invoked manually.
+description: Harness bootstrap — you interpret the harness DAG file and dispatch the next node after every skill completes. The DAG file is the single source of truth; this skill teaches you how to read it. Loaded at session start via hook, not invoked manually.
 ---
 
 # Using Harness
 
-`docs/harness/harness-flow.yaml` = DAG (single source of truth).
-**You = interpreter.** No runtime engine. Read the YAML, dispatch the next node yourself.
+**Harness DAG file**: `${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml`. The SessionStart hook injects the resolved path into context — use whichever absolute path the hook surfaced. **You = interpreter.** No runtime engine. Read the YAML, dispatch the next node yourself.
+
+> The plugin root is wherever Claude Code mounted this plugin (e.g. `~/.claude/plugins/marketplaces/<mp>/plugins/harness-flow/`). Never read `docs/harness/harness-flow.yaml` as a relative path — the user's project CWD won't have it.
 
 ## Core loop
 
 After any skill completes (or a user message arrives):
 
-1. **Re-read `docs/harness/harness-flow.yaml`** (~60 lines, cheap).
+1. **Re-read the harness DAG file** at `${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml` (~60 lines, cheap).
 2. **Identify current position** — which node just finished? What was its output JSON?
 3. **Find candidate next nodes** — any node whose `depends_on` includes the node you just ran.
 4. **Substitute & evaluate `when:`** — replace `$<id>.output.<field>` with actual values from recent outputs, evaluate the boolean (`==`, `||`, `&&`).
 5. **Apply `trigger_rule`** — default requires every `depends_on` to have completed; `one_success` fires as soon as one dep produced a matching output.
-6. **Invoke the first matching node.** Skills live at `skills/<command>/SKILL.md` — use the `Skill` tool if registered, otherwise `Read` that file and follow its instructions.
+6. **Invoke the first matching node.** Skills are registered by name when the plugin loads — prefer the `Skill` tool with the bare command name (e.g. `Skill("router")`). If the registry lookup fails, fall back to `Read` on `${CLAUDE_PLUGIN_ROOT}/skills/<command>/SKILL.md`.
 7. **No match → flow terminates.** Report final outcome to the user.
 
 ## Starting the flow
@@ -64,6 +65,6 @@ Skills own their own artifacts; `STATE.md` is main-thread responsibility.
 
 ## Files
 
-- Flow: `docs/harness/harness-flow.yaml`
-- Skills: `skills/<command>/SKILL.md` (read via `Skill` tool if registered, `Read` otherwise)
-- Artifacts: `.planning/{session_id}/`
+- Flow: `${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml` (plugin root, **not** user CWD)
+- Skills: registered by name on plugin load — `Skill("<command>")`. Fallback: `${CLAUDE_PLUGIN_ROOT}/skills/<command>/SKILL.md` via `Read`.
+- Artifacts: `.planning/{session_id}/` (relative — written into the **user's project**, not the plugin)

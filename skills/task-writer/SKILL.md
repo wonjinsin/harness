@@ -34,7 +34,7 @@ You receive this object from the main thread. Treat every field as authoritative
 - `request`: the user's original turn, verbatim. **Always present**; read it carefully even when PRD/TRD exist.
 - `prd_path` *(optional)*: `".planning/{session_id}/PRD.md"` if PRD was produced upstream, `null` otherwise.
 - `trd_path` *(optional)*: `".planning/{session_id}/TRD.md"` if TRD was produced upstream, `null` otherwise.
-- `brainstorming_output` *(optional)*: `{intent, target, scope_hint, constraints[], acceptance}` — may be absent when the router went straight to classifier.
+- `brainstorming_output` *(optional)*: `{intent, target, scope_hint, constraints[], acceptance}` — may be absent when router routed `plan` directly and brainstorming skipped its Q&A phase.
 
 If `prd_path` is set but the file is unreadable, halt and emit `{"outcome": "error", "session_id": "...", "reason": "PRD declared in payload but <path> not found"}`. Same for `trd_path`. Do not proceed by guessing.
 

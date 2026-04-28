@@ -1,23 +1,24 @@
 ---
 name: using-harness
-description: 하네스 부트스트랩 — `docs/harness/harness-flow.yaml` 을 해석해 매 스킬 종료 후 다음 노드를 직접 dispatch 한다. `harness-flow.yaml` 이 단일 소스 오브 트루스이고, 이 스킬은 그걸 읽는 법을 가르친다. 세션 시작 훅으로 로드되며 수동 호출 대상 아님.
+description: 하네스 부트스트랩 — 하네스 DAG 파일을 해석해 매 스킬 종료 후 다음 노드를 직접 dispatch 한다. DAG 파일이 단일 소스 오브 트루스이고, 이 스킬은 그걸 읽는 법을 가르친다. 세션 시작 훅으로 로드되며 수동 호출 대상 아님.
 ---
 
 # Using Harness
 
-`docs/harness/harness-flow.yaml` = DAG (단일 소스 오브 트루스).
-**너 = 인터프리터.** 런타임 엔진 없음. YAML 읽고 다음 노드 직접 dispatch.
+**하네스 DAG 파일**: `${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml`. SessionStart 훅이 해석된 절대 경로를 컨텍스트에 주입하니 그대로 사용. **너 = 인터프리터.** 런타임 엔진 없음. YAML 읽고 다음 노드 직접 dispatch.
+
+> 플러그인 루트는 Claude Code 가 이 플러그인을 마운트한 위치 (예: `~/.claude/plugins/marketplaces/<mp>/plugins/harness-flow/`). `docs/harness/harness-flow.yaml` 을 상대 경로로 읽으면 안 된다 — 유저 프로젝트 CWD 에는 그 파일이 없다.
 
 ## Core loop
 
 스킬 종료 시 (또는 유저 메시지 도착 시):
 
-1. **`docs/harness/harness-flow.yaml` 재독** (~60 줄, 저렴).
+1. **`${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml` 재독** (~60 줄, 저렴).
 2. **현재 위치 파악** — 어느 노드가 방금 끝났나? 출력 JSON 은 뭐였나?
 3. **후보 노드 찾기** — 방금 끝난 노드를 `depends_on` 에 가진 모든 노드.
 4. **`when:` 치환·평가** — `$<id>.output.<field>` 를 최근 출력값으로 치환하고 boolean 평가 (`==`, `||`, `&&`).
 5. **`trigger_rule` 적용** — 기본은 모든 `depends_on` 완료 필요, `one_success` 는 하나라도 매칭되면 즉시 발화.
-6. **첫 매칭 노드 호출.** 스킬은 `skills/<command>/SKILL.md` 에 있음 — 등록돼 있으면 `Skill` tool, 아니면 `Read` 로 해당 파일 읽고 지시 따름.
+6. **첫 매칭 노드 호출.** 플러그인 로드 시 스킬이 이름으로 등록돼 있으니 `Skill("<command>")` 우선. 등록 조회 실패 시 폴백으로 `${CLAUDE_PLUGIN_ROOT}/skills/<command>/SKILL.md` 를 `Read`.
 7. **매칭 없음 → 플로우 종료.** 최종 outcome 유저에게 보고.
 
 ## 플로우 시작
@@ -64,6 +65,6 @@ description: 하네스 부트스트랩 — `docs/harness/harness-flow.yaml` 을 
 
 ## 파일
 
-- 플로우: `docs/harness/harness-flow.yaml`
-- 스킬: `skills/<command>/SKILL.md` (등록돼 있으면 `Skill` tool, 아니면 `Read`)
-- 아티팩트: `.planning/{session_id}/`
+- 플로우: `${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml` (플러그인 루트, **유저 CWD 아님**)
+- 스킬: 플러그인 로드 시 이름으로 등록 — `Skill("<command>")`. 폴백: `${CLAUDE_PLUGIN_ROOT}/skills/<command>/SKILL.md` 를 `Read`.
+- 아티팩트: `.planning/{session_id}/` (상대 경로 — **유저 프로젝트** 에 작성, 플러그인 아님)

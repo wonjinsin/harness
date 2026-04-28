@@ -25,7 +25,7 @@ You receive this object from the dispatching main thread. Treat every field as a
 - `request`: the user's original turn, verbatim. **Read it carefully for tone and nuance** the structured fields drop.
 - `brainstorming_output` *(optional)*: `{intent, target, scope_hint, constraints[], acceptance}` — may be missing if router handed off `plan` directly.
 
-If `brainstorming_output` is null, recover intent from the verb in `request` (same heuristic as classifier: first-verb rule, default `add`).
+If `brainstorming_output` is null, recover intent from the verb in `request` (same heuristic brainstorming uses for the plan-direct path: first-verb rule, default `add`).
 
 ## Output
 
@@ -201,7 +201,7 @@ Note: the example is ~34 lines including blanks and sits at the **lower end** of
 ## Edge cases
 
 - **Request references files that don't exist**: investigate with Glob to confirm. If truly absent, add an Open question rather than inventing structure.
-- **User requested one feature but payload implies multiple**: treat the payload as authoritative (classifier may have scoped it). If the mismatch is large (e.g., request mentions 3 features, payload target covers 1), add an Open question.
+- **User requested one feature but payload implies multiple**: treat the payload as authoritative (brainstorming may have scoped it down). If the mismatch is large (e.g., request mentions 3 features, payload target covers 1), add an Open question.
 - **Signals matched `auth/` or `security/`**: Constraints section *must* have an entry — downstream phases (trd-writer/task-writer, evaluator) cannot recover security requirements from code alone, and skipped constraints fail silently. Never elide, no matter how small the change feels.
 - **Request in non-English language**: body in user's language, headers / field names in English. This keeps the file machine-parseable while staying readable for the user.
 - **>2 open questions after drafting**: note them in the PRD's Open questions section and proceed to emit `done` — the next writer (trd-writer or task-writer) re-reads the PRD and surfaces blocking questions. Do not self-escalate; scope decisions stay with the main thread.

@@ -25,7 +25,7 @@ dispatching 메인 스레드로부터 이 객체를 받는다. 모든 필드를 
 - `request`: 유저 원 요청, verbatim. **어조와 뉘앙스까지 주의 깊게 읽는다** — 구조화 필드가 놓친 것들.
 - `brainstorming_output` *(선택)*: `{intent, target, scope_hint, constraints[], acceptance}` — router 가 `plan` 을 직접 넘겼을 땐 없을 수 있음.
 
-`brainstorming_output` 이 null 이면 `request` 의 첫 동사로 intent 복원 (classifier 와 동일 휴리스틱: 첫 동사 규칙, 기본 `add`).
+`brainstorming_output` 이 null 이면 `request` 의 첫 동사로 intent 복원 (brainstorming 의 plan-direct 경로와 동일 휴리스틱: 첫 동사 규칙, 기본 `add`).
 
 ## 출력
 
@@ -201,7 +201,7 @@ Created: 2026-04-19
 ## 엣지 케이스
 
 - **요청이 존재 안 하는 파일 참조**: Glob 으로 확인. 진짜 없으면 구조를 지어내지 말고 Open question 추가.
-- **유저는 기능 하나 요청했는데 payload 가 다수 암시**: payload 권위 (classifier 가 범위 좁혔을 수 있음). 격차가 크면 (예: 요청은 3개, payload target 은 1개) Open question.
+- **유저는 기능 하나 요청했는데 payload 가 다수 암시**: payload 권위 (brainstorming 이 범위 좁혔을 수 있음). 격차가 크면 (예: 요청은 3개, payload target 은 1개) Open question.
 - **`auth/` 또는 `security/` 신호 매칭**: Constraints 섹션에 *반드시* 항목 — 하위 phase (trd-writer/task-writer, evaluator) 는 코드만으로 보안 요구사항을 복원할 수 없고, 생략된 제약은 조용히 실패하는 방식으로 사라진다. 변경이 작아 보여도 생략 금지.
 - **비영어 요청**: 본문은 유저 언어, 헤더·필드명은 영어. 기계 판독성과 유저 가독성 동시 확보.
 - **초안 후 Open question >2 개**: PRD 의 Open questions 섹션에 기록하고 `done` 을 emit — 다음 writer (trd-writer / task-writer) 가 PRD 를 재독하며 차단성 질문을 유저에게 노출한다. 자체 승격 금지; 범위 결정은 메인 스레드 소유.

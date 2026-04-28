@@ -26,7 +26,7 @@ You receive this object from the main thread. Treat every field as authoritative
 - `session_id`: `"YYYY-MM-DD-{slug}"` — determines the output folder.
 - `request`: the user's original turn, verbatim. **Read it carefully for tone and nuance** the structured fields drop.
 - `prd_path` *(optional)*: `".planning/{session_id}/PRD.md"` if a PRD was produced upstream, `null` otherwise.
-- `brainstorming_output` *(optional)*: `{intent, target, scope_hint, constraints[], acceptance}` — may be absent when the router went straight to classifier.
+- `brainstorming_output` *(optional)*: `{intent, target, scope_hint, constraints[], acceptance}` — may be absent when router routed `plan` directly and brainstorming skipped its Q&A phase.
 
 If `prd_path` is set but the file is unreadable or missing, halt and emit `{"outcome": "error", "session_id": "...", "reason": "PRD declared in payload but <path> not found"}`. Do not proceed by guessing — the payload is a contract from the main thread.
 

@@ -1,8 +1,8 @@
 # Flow PRD v0.2 — Claude Code Harness
 
-> **Status**: ✅ v0.2 완성 (2026-04-18), 🔁 v0.2.1 보정 (2026-04-19) — Skill × Agent 하이브리드 반영
+> **Status**: ✅ v0.2 완성 (2026-04-18), 🔁 v0.2.1 보정 (2026-04-19), 🔁 v0.2.2 보정 (2026-04-26) — `brainstorming` + `complexity-classifier` 통합 반영
 > **Scope**: 플로우 설계만. 구체적 스킬/프롬프트/훅 구현은 v0.3 이후.
-> **확정 결정**: R2/R3/R4/R5/R6 (섹션 12~16) + D11 (섹션 4.1) · **미확정**: R1 (9개 스킬 프롬프트 + 5개 agent definition — v0.3)
+> **확정 결정**: R2/R3/R4/R5/R6 (섹션 12~16) + D11 (섹션 4.1) + D12 (섹션 4.2) · **미확정**: R1 (8개 스킬 프롬프트 + 5개 agent definition — v0.3)
 
 ---
 
@@ -27,6 +27,7 @@ Claude Code 위에서 동작하는 **자체 하네스**. 유저 요청을 받아
 | D9 | 실패 재실행 | Stop 훅 + retry_count (≥3 에스컬레이션) | OMC ralph 패턴 |
 | D10 | 롤백 | 본 버전 제외 | 유저 명시 |
 | D11 | 스킬·에이전트 분담 | 하이브리드: 경량 스테이지는 Skill (메인 컨텍스트), 무거운 산출물 생성 스테이지는 Agent 가 **자체 컨텍스트에서 동명의 Skill 을 호출** | 메인 컨텍스트 보호 + Skill 을 single source of truth 로 유지 |
+| D12 | 인테이크 스킬 통합 | `brainstorming` + `complexity-classifier` → `brainstorming` 단일 스킬 (Phase A 명확화 + Phase B 분류·Gate 1) | 두 스킬이 공유하던 pivot/exit-casual 처리, 멀티턴 대화 모양, 책임 경계 누수 제거 |
 
 ---
 
@@ -37,34 +38,35 @@ Claude Code 위에서 동작하는 **자체 하네스**. 유저 요청을 받아
    ↓
 [Phase 1] Router
    ├─ casual     → 일반 대화 (END)
-   ├─ clarify    → Phase 2
-   └─ plan       → Phase 3 (Phase 2 우회 가능)
+   ├─ clarify    → Phase 2 (Phase A + B 풀 진행)
+   ├─ plan       → Phase 2 (Phase A 스킵, B 부터)
+   └─ resume     → Phase 2 (Step 0 숏서킷)
    ↓
-[Phase 2] Clarification
+[Phase 2] Brainstorming  (인테이크 = 명확화 + 분류 + Gate 1)
+   ├─ Phase A: Q&A 로 actionability 체크리스트 채움 (clarify 일 때만)
+   └─ Phase B: 신호·파일 수 → 경로 추천 → 유저 승인
+       ├─ prd-trd:   PRD → TRD → Tasks
+       ├─ prd-only:  PRD → Tasks
+       ├─ trd-only:  TRD → Tasks
+       └─ tasks-only: Tasks only
+   ↓ (Gate 1 흡수 — brainstorming 내부에서 추천 + 승인)
+[Phase 3] Artifact Creation — PRD.md / TRD.md / TASKS.md 생성
    ↓
-[Phase 3] Complexity Classifier
-   ├─ A: PRD → TRD → Tasks  (신규 기능, 복잡)
-   ├─ B: PRD → Tasks        (신규 기능, 단순)
-   ├─ C: TRD → Tasks        (리팩토링/기술)
-   └─ D: Tasks only         (버그/trivial)
+[Phase 4] Execution — TASKS.md 를 subagent 로 디스패치
    ↓
-[Gate 1] 유저 승인 — "B안으로 진행할까요?"
-   ↓
-[Phase 4] Artifact Creation — PRD.md / TRD.md / TASKS.md 생성
-   ↓
-[Phase 5] Execution — TASKS.md 를 subagent로 디스패치
-   ↓
-[Phase 6] Evaluation Loop — lint / test / rule 검증
+[Phase 5] Evaluation Loop — lint / test / rule 검증
    ├─ PASS → Gate 2
-   └─ FAIL → Phase 5로 루프백 (retry_count++)
+   └─ FAIL → Phase 4 로 루프백 (retry_count++)
           └─ retry ≥ 3 → 에스컬레이션 (유저 호출)
    ↓
 [Gate 2] 유저 승인 — "CHANGELOG 업데이트할까요?"
    ↓
-[Phase 7] Doc Auto-update
+[Phase 6] Doc Auto-update
    ↓
 완료
 ```
+
+> Phase 번호가 v0.2.1 의 1~7 에서 v0.2.2 에선 1~6 으로 줄어든다 — Clarification 과 Complexity Classifier 가 Phase 2 (brainstorming) 한 노드에 통합되었기 때문. 본 문서의 다른 섹션에 남아 있는 "Phase 3/4/5/6/7" 표기는 의미상 신 번호 -1 로 읽으면 된다.
 
 ---
 
@@ -72,9 +74,8 @@ Claude Code 위에서 동작하는 **자체 하네스**. 유저 요청을 받아
 
 | 컴포넌트 | 종류 | 역할 |
 |---|---|---|
-| `router` | **Skill** (main) | 입력을 `casual/clarify/plan` 중 하나로 분류. 결정론 먼저, 실패 시 LLM. |
-| `brainstorming` | **Skill** (main) | 유저 요청 명확화. 종료 기준: 유저 확인 or 필수 필드 채워짐. |
-| `complexity-classifier` | **Skill** (main) | A/B/C/D 추천, 유저 확정 받음. |
+| `router` | **Skill** (main) | 입력을 `casual / clarify / plan / resume` 중 하나로 분류. 결정론 먼저, 실패 시 LLM. |
+| `brainstorming` | **Skill** (main) | 인테이크 전부 소유 — Phase A 명확화 (clarify 일 때만 Q&A) + Phase B 분류 (prd-trd / prd-only / trd-only / tasks-only) + Gate 1 유저 승인. 경로 이름을 `outcome` 으로 바로 emit. |
 | `subagent-dispatcher` | **Skill** (main) | `TASKS.md` 읽어 Claude Code `Task` 툴로 병렬/직렬 디스패치. **heavy 스테이지(prd-writer/trd-writer/task-writer/evaluator/doc-updater) 진입 시 동명의 agent 로 dispatch** (4.1 참조). |
 | `prd-writer` | **Agent + Skill** | Agent 가 자체 컨텍스트에서 동명의 Skill 로드 → PRD.md 생성 → 경로 리턴. |
 | `trd-writer` | **Agent + Skill** | 동일 패턴 — TRD.md 생성. |
@@ -94,7 +95,7 @@ Claude Code 위에서 동작하는 **자체 하네스**. 유저 요청을 받아
 
 | 분류 | 컴포넌트 | 이유 |
 |---|---|---|
-| **Skill only** (메인 컨텍스트) | `router`, `brainstorming`, `complexity-classifier`, `subagent-dispatcher` | 분류·대화·조율이 본질. 세션 상태 (session_id, classification, 유저 응답) 를 메인 흐름에 공유해야 함. 가볍고 빠름. |
+| **Skill only** (메인 컨텍스트) | `router`, `brainstorming`, `subagent-dispatcher` | 분류·대화·조율이 본질. 세션 상태 (session_id, route, 유저 응답) 를 메인 흐름에 공유해야 함. 가볍고 빠름. |
 | **Agent + Skill** (격리 컨텍스트) | `prd-writer`, `trd-writer`, `task-writer`, `evaluator`, `doc-updater` | 대량 탐색·한방에 산출물 생성. 메인 컨텍스트 보호. Agent 가 얇은 래퍼, Skill 이 instruction 본체. |
 
 **디스패치 패턴**:
@@ -134,8 +135,7 @@ Agent 컨텍스트 (격리, 메인 히스토리 못 봄)
 | 스킬 | done 페이로드 | error/escalate 페이로드 |
 |---|---|---|
 | router | `{outcome: "plan"\|"clarify"\|"resume", session_id}` (casual 은 JSON 없이 plain text 로 종료) | (해당 없음) |
-| brainstorming | `{outcome: "clarified", session_id}` | `{outcome: "pivot"\|"exit-casual", session_id, reason}` |
-| complexity-classifier | `{outcome: "prd-trd"\|"prd-only"\|"trd-only"\|"tasks-only", session_id, request, brainstorming_output}` | `{outcome: "pivot"\|"exit-casual", session_id, reason}` |
+| brainstorming | `{outcome: "prd-trd"\|"prd-only"\|"trd-only"\|"tasks-only", session_id, request, brainstorming_output}` (Phase A 가 스킵된 경우 `brainstorming_output`은 `null`) | `{outcome: "pivot"\|"exit-casual", session_id, reason}` |
 | prd/trd/task-writer | `{outcome: "done", session_id}` | `{outcome: "error", session_id, reason}` |
 | parallel-task-executor | `{outcome: "done"\|"blocked"\|"failed", session_id}` | `{outcome: "error", session_id, reason}` |
 | evaluator | `{outcome: "pass", session_id}` | `{outcome: "escalate"\|"error", session_id, reason}` |
@@ -149,7 +149,38 @@ Agent 컨텍스트 (격리, 메인 히스토리 못 봄)
 - Skill = single source of truth (직접 호출·agent 경유 둘 다 지원)
 - Agent definition 은 얇은 `.claude/agents/{name}.md` 파일 — "이 skill 호출해서 작업 수행하라" 한 줄 수준
 - Skill 만 개선하면 메인 직접 호출과 agent 경유 둘 다 자동 개선
-- 메인 컨텍스트엔 **agent 의 최종 요약 한 줄만** 남음 → 9 스테이지 풀 사이클 돌려도 컨텍스트 깨끗
+- 메인 컨텍스트엔 **agent 의 최종 요약 한 줄만** 남음 → 8 스테이지 풀 사이클 돌려도 컨텍스트 깨끗
+
+### 4.2 인테이크 스킬 통합 (D12 상세)
+
+**문제**: v0.2.1 까지 `brainstorming` (명확화 Q&A) 와 `complexity-classifier` (티어 추천 + Gate 1 승인) 는 별도 스킬이었다. 운영해 보니 셋이 중복됐다:
+
+1. **공통 종료 시그널** — `pivot`, `exit-casual` 처리 로직이 양쪽에 똑같이 존재
+2. **공통 대화 모양** — 둘 다 메인 스레드에서 멀티턴, 한 번에 한 질문, 유저 언어 미러링
+3. **책임 누수** — classifier 가 "intent / target 이 빠졌으면 직접 묻고 싶다" 는 유혹에 노출 (brainstorming 의 일을 침범)
+4. **유저 입장 불연속** — 명확화 ↔ 분류·승인이 "한 인테이크 대화" 로 자연스럽게 이어지는데 스킬이 갈라져 있어 핸드오프 비용 발생
+
+**해결**: 두 스킬을 `brainstorming` 한 스킬로 통합. 내부적으로 두 phase 를 둔다:
+
+| 단계 | 역할 | 실행 조건 |
+|---|---|---|
+| **Phase A — Clarify** | actionability 체크리스트 (`intent`, `target`, `scope_hint`, `constraints`, `acceptance`) Q&A 로 채움 | `route == "clarify"` 일 때만. `route == "plan"` / `"resume"` 면 통째로 스킵. |
+| **Phase B — Classify + Gate 1** | 신호 탐지 → 파일 수 추정 → 경로 판정 → tasks-only 자기검증 → 추천 제시 → 유저 승인 → ROADMAP/STATE 확정 + 경로 emit | 항상 실행 (Step 0 재개 숏서킷 제외). |
+
+**입력 분기**:
+
+| router outcome | 통합 스킬 진입점 |
+|---|---|
+| `clarify` | Phase A 부터 (Q&A 풀 진행 → A4 확인 → Phase B) |
+| `plan` | Phase B 부터 (Phase A 스킵, 경로 판정 직행) |
+| `resume` | Step 0 숏서킷 (기존 `Complexity:` 줄 + `brainstorming [x]` 있으면 다음 `[ ]` phase 로 점프) |
+
+**Outcome 단일화**: 명확화 결과(`clarified`) 와 분류 결과(`prd-trd` 등) 를 별도 outcome 으로 emit 하던 v0.2.1 안을 폐기하고, 통합 스킬은 **경로 이름을 직접 outcome 으로 emit**. `harness-flow.yaml` 의 후속 노드 `when:` 식이 이 문자열만 평가하면 된다 — 중간 outcome 이 사라져 DAG 도 단순해진다 (섹션 14 Outcome 계약 참조).
+
+**남은 책임은 그대로**:
+- 코드/스펙 작성, 솔루션 제안 — 여전히 brainstorming 의 일 아님 (`prd-writer` / `trd-writer` 의 몫)
+- 디스패치 — 메인 스레드가 emit 된 `outcome` 을 읽고 `harness-flow.yaml` 따라 진행 (스킬이 직접 다음 agent 호출 금지)
+- 세션 파일 — 경로 outcome 에서만 `ROADMAP.md` (Complexity 줄 + `brainstorming` 체크박스 한 줄에 경로·승인 상태 동시 기록) + `STATE.md` (`Current Position` + `Last activity`) 갱신
 
 ---
 
@@ -161,81 +192,74 @@ Agent 컨텍스트 (격리, 메인 히스토리 못 봄)
 
 **배치 근거**: Claude Code 스킬/훅/커맨드는 각자 정해진 디렉토리에 흩어져 존재 (`skills/`, `hooks/`, `commands/`). `harness-flow.yaml` 은 "실행 자산" 이 아니라 **참조 문서** 성격이므로 `docs/` 에 위치. OMC 방식(흩뿌리기)과 동일한 컨벤션.
 
+현재 archon-style DAG (`depends_on` + `when:`) 로 통일. 각 노드는 `outcome` JSON 을 emit 하고, 후속 노드는 `when:` 식에서 그 문자열을 평가해 dispatch 여부를 결정한다. `context: fresh` 는 격리 agent 컨텍스트에서 실행된다는 표식.
+
 ```yaml
-version: 1
-name: default-flow
+name: harness-default-flow
+description: |
+  Skill × Agent hybrid harness. Intake (clarify + tier classification) → PRD/TRD/TASKS → execute → evaluate → doc-update.
 
-# runner 값의 의미:
-#   skill  — 메인 컨텍스트에서 Skill 툴로 직접 실행
-#   agent  — dispatcher 가 Task 툴로 agent dispatch,
-#            agent 가 자체 컨텍스트에서 동명의 skill 호출 (4.1 참조)
+  router outcome:        casual | clarify | plan | resume
+  brainstorming outcome: prd-trd | prd-only | trd-only | tasks-only | pivot | exit-casual
 
-phases:
+nodes:
   - id: router
-    runner: skill
-    target: router
-    role: "입력 분류"
-    routes:
-      casual: END
-      clarify: brainstorming
-      plan: classifier
+    command: router
 
   - id: brainstorming
-    runner: skill
-    target: brainstorming
-    role: "요청 명확화"
-    next: classifier
-
-  - id: classifier
-    runner: skill
-    target: complexity-classifier
-    role: "A/B/C/D 중 선택 + 유저 승인 (Gate 1)"
-    routes:
-      A: prd-writer
-      B: prd-writer
-      C: trd-writer
-      D: task-writer
+    command: brainstorming
+    depends_on: [router]
+    when: >-
+      $router.output.outcome == 'clarify' ||
+      $router.output.outcome == 'plan' ||
+      $router.output.outcome == 'resume'
 
   - id: prd-writer
-    runner: agent          # 격리 컨텍스트 dispatch
-    target: prd-writer      # agent definition + 동명의 skill
-    role: "PRD.md 생성"
-    next:
-      when complexity=A: trd-writer
-      else: task-writer
+    command: prd-writer
+    depends_on: [brainstorming]
+    when: "$brainstorming.output.outcome == 'prd-trd' || $brainstorming.output.outcome == 'prd-only'"
+    context: fresh
 
   - id: trd-writer
-    runner: agent
-    target: trd-writer
-    next: task-writer
+    command: trd-writer
+    depends_on: [brainstorming, prd-writer]
+    trigger_rule: one_success
+    when: "$brainstorming.output.outcome == 'prd-trd' || $brainstorming.output.outcome == 'trd-only'"
+    context: fresh
 
   - id: task-writer
-    runner: agent
-    target: task-writer
-    next: executor
+    command: task-writer
+    depends_on: [brainstorming, prd-writer, trd-writer]
+    trigger_rule: one_success
+    when: >-
+      $brainstorming.output.outcome == 'prd-trd' ||
+      $brainstorming.output.outcome == 'prd-only' ||
+      $brainstorming.output.outcome == 'trd-only' ||
+      $brainstorming.output.outcome == 'tasks-only'
+    context: fresh
 
   - id: executor
-    runner: skill           # dispatcher 는 메인에 있음 (subagent 병렬 조율)
-    target: subagent-dispatcher
-    next: evaluator
+    command: parallel-task-executor
+    depends_on: [task-writer]
 
   - id: evaluator
-    runner: agent           # 규칙 검증을 격리 컨텍스트에서
-    target: evaluator
-    routes:
-      pass: doc-updater
-      fail: executor        # 루프백
-    max_retries: 3
-    on_max_retries: escalate
+    command: evaluator
+    depends_on: [executor]
+    context: fresh
 
   - id: doc-updater
-    runner: agent           # 문서 스캔 + findings 생성 (heavy)
-    target: doc-updater     # Gate 2 승인은 agent 가 유저에게 직접 질의
-    next: END
+    command: doc-updater
+    depends_on: [evaluator]
+    when: "$evaluator.output.outcome == 'pass'"
+    context: fresh
 ```
 
+**casual / pivot / exit-casual 처리**: router 가 `casual` 을 emit 하면 brainstorming 의 `when:` 이 false → DAG 자연 종료. brainstorming 이 `pivot` / `exit-casual` 을 emit 해도 모든 후속 `when:` 이 false → 마찬가지로 종료.
+
+**evaluator 루프백**: evaluator 가 `fail` 을 emit 하면 doc-updater 의 `when:` 이 false 라 doc-updater 는 안 돌고, 메인 스레드 / Stop 훅이 retry 결정 (섹션 16 참조). DAG 자체는 한 번 도는 단방향 — 루프백은 메인 스레드 책임.
+
 **각 Skill SKILL.md 상단엔** 이 한 줄만:
-> `~/.claude/docs/harness/harness-flow.yaml` 을 읽고, 이 스킬의 `routes`/`next` 에 따라 다음 phase 를 호출하라. 다음 phase 의 `runner: agent` 이면 메인의 `subagent-dispatcher` 가 해당 agent 로 dispatch 한다.
+> `~/.claude/docs/harness/harness-flow.yaml` 을 읽고, 이 스킬의 `outcome` 을 emit 하라. 메인 스레드가 후속 노드의 `when:` 식을 평가해 dispatch 여부를 결정한다. 후속 노드에 `context: fresh` 가 붙어 있으면 격리 agent 컨텍스트에서 실행된다.
 
 **각 Agent definition (`agents/{name}.md`) 은 얇게**:
 ```markdown
@@ -270,24 +294,23 @@ tools: Read, Write, Glob, Grep, Skill
 ```markdown
 # Session 2026-04-17-add-2fa-login
 Request: "로그인 페이지에 2FA 추가"
-Complexity: B (PRD → Tasks)
+Complexity: prd-only (PRD → Tasks)
 
 ## Phases
-- [x] router           → plan
-- [ ] ~~brainstorming~~    (우회됨)
-- [x] classifier       → B
-- [x] gate-1-approval  → approved
-- [x] prd-writer       → PRD.md
-- [ ] task-writer      → TASKS.md  ← 현재 여기
+- [x] router             → plan
+- [x] brainstorming      → prd-only (approved)
+- [x] prd-writer         → PRD.md
+- [ ] task-writer        → TASKS.md  ← 현재 여기
 - [ ] executor
 - [ ] evaluator
-- [ ] confirm-doc-updates
 - [ ] doc-updater
 
 ## Artifacts
 - PRD.md: .planning/2026-04-17-add-2fa-login/PRD.md
 - TASKS.md: (미생성)
 ```
+
+> `brainstorming` 줄의 우측 라벨이 경로 + 승인 상태를 함께 담는다 — `→ prd-only (approved)` 가 기본, 유저가 추천을 뒤집은 경우 `→ tasks-only (overridden from prd-only)` 로 표기. v0.2.1 까지는 `gate-1-approval` 을 별 줄로 두었지만 D12 통합 후엔 brainstorming 한 줄로 표현해도 손실이 없어 제거 (한 스킬 = 한 ROADMAP 줄 원칙). Phase A 스킵 / 풀 진행 / resume 숏서킷 같은 사후 진단은 STATE.md `Last activity` 에 남는다.
 
 **갱신 규칙**: 각 스킬이 자기 phase 완료 시 체크박스 `[ ]` → `[x]`.
 
@@ -345,8 +368,8 @@ CC session_id: 3a160f86-db0a-42c2-9254-43b77f44505e
 `~/.claude/docs/harness/harness-flow.yaml` 을 Mermaid/ASCII 다이어그램으로 렌더링.
 
 ### 7.4 승인 게이트 (흡수 방식)
-- **Gate 1** (Phase 3→4): `complexity-classifier` 스킬 내부에서 Tier 추천 직후 유저 승인
-- **Gate 2** (Phase 6→7): `doc-updater` 스킬 **첫 단계** 에서 승인 질의 ("CHANGELOG 및 문서 영향 분석 진행할까요?")
+- **Gate 1** (Phase 2→3, 인테이크→아티팩트): `brainstorming` 스킬 Phase B 내부에서 경로 추천 (`prd-trd` / `prd-only` / `trd-only` / `tasks-only`) 직후 유저 승인. v0.2.1 까지 `complexity-classifier` 가 담당했으나 D12 통합으로 brainstorming 으로 흡수됨.
+- **Gate 2** (Phase 5→6, 평가→문서 업데이트): `doc-updater` 스킬 **첫 단계** 에서 승인 질의 ("CHANGELOG 및 문서 영향 분석 진행할까요?")
 - 별도 `user-approval` 스킬 없음 — 각 담당 스킬에 흡수. ROADMAP 에 응답 기록.
 
 ---
@@ -358,10 +381,9 @@ CC session_id: 3a160f86-db0a-42c2-9254-43b77f44505e
 ├── docs/
 │   └── harness/
 │       └── harness-flow.yaml      ← 정적 플로우 정의
-├── skills/                         ← 9개 스킬 (instruction 본체, agent 도 로드해서 사용)
+├── skills/                         ← 8개 스킬 (instruction 본체, agent 도 로드해서 사용)
 │   ├── router/SKILL.md
-│   ├── brainstorming/SKILL.md
-│   ├── complexity-classifier/SKILL.md
+│   ├── brainstorming/SKILL.md      ← Phase A 명확화 + Phase B 분류·Gate 1 통합
 │   ├── prd-writer/SKILL.md         ← agent 경유
 │   ├── trd-writer/SKILL.md         ← agent 경유
 │   ├── task-writer/SKILL.md        ← agent 경유
@@ -430,9 +452,10 @@ CC session_id: 3a160f86-db0a-42c2-9254-43b77f44505e
 
 ## 11. 성공 기준 (이 플로우가 제대로 작동하는지)
 
-- [ ] 유저가 임의 요청 → 첫 응답까지 Router 가 올바른 분류 (casual/clarify/plan)
-- [ ] 복잡도 A 요청에서 PRD → TRD → Tasks 순서 이탈 없음 (YAML 덕분)
-- [ ] 세션 중단 후 재시작 → ROADMAP 의 마지막 `[x]` 다음부터 재개
+- [ ] 유저가 임의 요청 → 첫 응답까지 Router 가 올바른 분류 (casual / clarify / plan / resume)
+- [ ] `prd-trd` 요청에서 PRD → TRD → Tasks 순서 이탈 없음 (YAML 덕분)
+- [ ] `clarify` → brainstorming Phase A 진입, `plan` → Phase A 스킵 후 Phase B 직행이 일관되게 동작
+- [ ] 세션 중단 후 재시작 → ROADMAP 의 마지막 `[x]` 다음부터 재개 (brainstorming Step 0 숏서킷 포함)
 - [ ] Eval 실패 시 `STATE.md` 의 retry_count 증가, 3회 후 `escalated: true`
 - [ ] `/status` 로 현재 phase + retry 상태 즉시 확인 가능
 
@@ -558,7 +581,7 @@ LLM 이 유저에게 제시 + 번복 허용
 **강제 이유**: superpowers `brainstorming` SKILL.md 가 명시하는 anti-pattern "간단해 보여서 설계 스킵" 을 남용 방지.
 
 **절차**:
-1. Router/classifier 가 tasks-only 추천 시, classifier 스킬 내부에서 다음 체크리스트 통과 필요:
+1. brainstorming Phase B 가 tsks-only 후보를 도출하면, 같은 스킬 내부에서 다음 체크리스트 통과 필요:
    - [ ] 명확히 버그 수정 또는 typo/format/주석 수준인가?
    - [ ] 예상 수정 파일 ≤ 2 인가?
    - [ ] 보안·아키텍처 신호 매칭 없는가?
@@ -567,7 +590,7 @@ LLM 이 유저에게 제시 + 번복 허용
 3. 모두 통과 → 유저에게 제시: `"tasks-only 로 바로 진행할까요? (설계 건너뜀)"`
 
 ### 파일 수 추정
-- **주체**: LLM (classifier 스킬 내부)
+- **주체**: LLM (brainstorming 스킬 Phase B 내부)
 - **방식**: 유저 요청 분석 → 대략치 추출 (정수 하나)
 - **유저 제시 예시**: `"prd-only 추천: 예상 3~4파일 수정, 보안 신호 없음. 진행할까요?"`
 - **유저 번복**:
@@ -586,9 +609,9 @@ LLM 이 유저에게 제시 + 번복 허용
 | "`useState` → `useReducer` 리팩토링" | 3 | × | trd-only |
 | "Prisma → Drizzle 마이그레이션" | 15 | ✅ `migrations/`, `package.json` | prd-trd |
 
-### Outcome 계약 (2026-04-22 archon-style `harness-flow.yaml` 반영)
+### Outcome 계약 (2026-04-22 archon-style `harness-flow.yaml` + 2026-04-26 D12 통합 반영)
 
-`harness-flow.yaml` 이 archon 스타일 DAG (`depends_on` + `when:`) 로 통일되면서, classifier 스킬의 최종 JSON `outcome` 필드는 경로 이름을 **직접** 담아야 한다. 메인 스레드는 후속 노드의 `when:` 식에서 이 문자열을 평가해 dispatch 여부를 결정한다:
+`harness-flow.yaml` 이 archon 스타일 DAG (`depends_on` + `when:`) 로 통일되면서, **분류 결과를 emit 하는 노드 = `brainstorming`** (D12 통합) 의 최종 JSON `outcome` 필드는 경로 이름을 **직접** 담아야 한다. 메인 스레드는 후속 노드의 `when:` 식에서 이 문자열을 평가해 dispatch 여부를 결정한다:
 
 ```json
 { "outcome": "prd-trd", ... }      // prd-trd 확정: PRD → TRD → Tasks
@@ -599,23 +622,23 @@ LLM 이 유저에게 제시 + 번복 허용
 { "outcome": "exit-casual" }       // 작업 요청 아니었음
 ```
 
-기존 안이었던 `{"outcome": "classified", "classification": "A"}` 중첩 형태 및 `A/B/C/D` 단일 문자 라벨은 **쓰지 않는다**. 경로 승격/강등 (tasks-only 자기검증 실패 → prd-only) 도 classifier 스킬 내부에서 해결한 뒤, 최종 outcome 은 승격된 경로 이름 하나를 담는다.
+기존 안이었던 `{"outcome": "classified", "classification": "A"}` 중첩 형태, `A/B/C/D` 단일 문자 라벨, 그리고 v0.2.1 의 `{"outcome": "clarified"}` 중간 outcome 은 **쓰지 않는다**. 경로 승격/강등 (tasks-only 자기검증 실패 → prd-only) 도 brainstorming 내부에서 해결한 뒤, 최종 outcome 은 승격된 경로 이름 하나를 담는다.
 
 `harness-flow.yaml` 의 후속 노드 `when:` 식:
 
 ```yaml
 - id: prd-writer
-  when: "$classifier.output.outcome == 'prd-trd' || $classifier.output.outcome == 'prd-only'"
+  when: "$brainstorming.output.outcome == 'prd-trd' || $brainstorming.output.outcome == 'prd-only'"
 
 - id: trd-writer
-  when: "$classifier.output.outcome == 'prd-trd' || $classifier.output.outcome == 'trd-only'"
+  when: "$brainstorming.output.outcome == 'prd-trd' || $brainstorming.output.outcome == 'trd-only'"
 
 - id: task-writer
   when: >-
-    $classifier.output.outcome == 'prd-trd' ||
-    $classifier.output.outcome == 'prd-only' ||
-    $classifier.output.outcome == 'trd-only' ||
-    $classifier.output.outcome == 'tasks-only'
+    $brainstorming.output.outcome == 'prd-trd' ||
+    $brainstorming.output.outcome == 'prd-only' ||
+    $brainstorming.output.outcome == 'trd-only' ||
+    $brainstorming.output.outcome == 'tasks-only'
 ```
 
 pivot / exit-casual 일 때는 모든 후속 `when:` 이 false → 연쇄 skip → 플로우 자연 종료.

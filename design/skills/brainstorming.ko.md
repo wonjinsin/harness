@@ -1,122 +1,146 @@
 ---
 name: brainstorming
-description: Router 가 `clarify` 를 넘긴 경우 반드시 사용 — 요청이 작아 보여서 추측으로 때우고 싶을 때도 포함. 요청이 `complexity-classifier` 가 티어를 고르고 하위 writer 들이 초안을 쓸 수 있을 만큼의 신호를 갖출 때까지 짧은 Q&A 루프를 돈다. 이 스킬은 구조화된 payload 에서 멈춘다 — 디자인·스펙은 prd-writer / trd-writer 의 아티팩트다.
+description: Router 가 `clarify`, `plan`, `resume` 중 하나를 넘긴 경우 반드시 사용. 인테이크 전부를 소유한다 — 필요 시 actionability 체크리스트를 채우는 Q&A, 그리고 prd-trd / prd-only / trd-only / tasks-only 중 하나로의 복잡도 분류 + Gate 1 유저 승인. 경로 이름을 `outcome` 으로 직접 emit. harness-flow.yaml 에 따라 prd-writer / trd-writer / task-writer 로 라우팅한다.
 ---
 
 # Brainstorming
 
 ## 목적
 
-Router 가 `clarify` 로 분류한 요청은 유저가 작업을 원하는 것은 명확하지만, 한 턴만으로는 router 가 *무엇을* 할지 판별할 수 없는 경우다. 이 스킬의 역할은 정확히 하나 — **유저에게 꼭 필요한 질문만 던져서 actionability 체크리스트를 채우고 `complexity-classifier` 로 인계**한다. 그 이상은 안 한다.
+Brainstorming 은 하네스의 **인테이크 스킬**이다. 과거 두 스킬에 나뉘어 있던 두 가지 책임을 한 스킬에서 소유한다:
 
-디자인 brainstorming 이 아니다. 접근법을 제안하거나 디자인 문서를 쓰거나 트레이드오프를 평가하지 않는다 — 그건 `prd-writer` / `trd-writer` 의 몫이다. 이 스킬의 산출물은 구조화된 payload 이지 스펙이 아니다.
+1. **요청 명확화** — router 가 `clarify` 로 라우팅하면, 분류·드래프팅에 필요한 신호가 다 모일 때까지 짧은 Q&A 루프를 돈다.
+2. **경로 분류** — `prd-trd` / `prd-only` / `trd-only` / `tasks-only` 중 하나 선정 후 **Gate 1** (아티팩트 생성 착수 전 유저 승인) 흡수.
 
-## 왜 이 스킬이 필요한가
+이 스킬은 절대 해결책을 제안하지 않고, 스펙·코드 작성도 하지 않는다. 산출물은 단 하나의 경로 payload — 하위 writer (`prd-writer` / `trd-writer` / `task-writer`) 가 신뢰할 수 있는.
 
-Clarification 단계가 없으면 router 의 `clarify` 버킷이 `complexity-classifier` 로 바로 흘러들어, classifier 가 얇은 신호로 잘못된 티어를 고르거나 자기가 명확화 질문을 직접 던지게 된다 — 책임 중복 + classifier 비대화. "유저가 정말 원하는 게 뭐냐" 대화를 이 스킬에 모아두면, 하위 스테이지는 받은 payload 를 신뢰할 수 있다.
+## 왜 한 스킬인가
+
+"질문하기" 와 "티어 고르기" 를 분리하면 책임이 샌다 — classifier 가 자기 명확화 질문을 던지고, brainstorming 단계는 classifier 가 무시할 답을 묻는다. 두 단계 모두 pivot/exit-casual 처리를 공유하고, 둘 다 메인 스레드 멀티턴 대화다. 하나로 합치면 유저는 한 번의 인테이크 대화, 한 번의 승인, 한 번의 인계를 경험한다.
 
 ## 입력
 
-이 스킬은 메인 스레드에서 실행된다. 라이브 대화 컨텍스트 접근 가능. Router 로부터 받는 payload:
+메인 스레드 실행 — 라이브 대화 컨텍스트 접근 가능. Router 로부터 받는 payload:
 
 - `session_id`: `"YYYY-MM-DD-{slug}"`
 - `request`: 유저의 원 요청, verbatim, 언어 무관
+- `route`: `"clarify"` | `"plan"` | `"resume"` — `router.output.outcome` 의 미러. Q&A 단계 실행 여부를 결정한다.
+- `resume`: `route == "resume"` 일 때 `true` (Step 0 숏서킷)
 
 그 외 스킬이 이 스킬을 호출하지 않는다. 그 외 payload 필드 없음.
 
 ## 출력
 
-이 스킬은 **세 가지 터미널 payload 중 하나**로 끝난다. 스킬의 마지막 메시지는 `outcome` 으로 태깅된 JSON 하나.
+이 스킬은 **여섯 가지 터미널 payload 중 하나**로 끝난다. 마지막 메시지는 JSON 하나이며, `outcome` 필드에 경로 이름(또는 터미널 신호)을 바로 담는다. 중첩 `classification` 필드 없음 — 메인 스레드가 `harness-flow.yaml` 의 `when:` 식에서 `outcome` 문자열을 직접 평가한다.
 
-**정상 명확화** — `complexity-classifier` 로 넘기는 보강된 payload:
+**경로 outcome** — `outcome` 이 경로 이름 (`prd-trd`, `prd-only`, `trd-only`, `tasks-only`):
 
 ```json
 {
-  "outcome": "clarified",
+  "outcome": "prd-trd",
   "session_id": "2026-04-19-...",
   "request": "...",
-  "intent": "add|fix|refactor|migrate|remove|other",
-  "target": "...",
-  "scope_hint": "single-file|subsystem|multi-system",
-  "constraints": ["..."],
-  "acceptance": "..."
+  "brainstorming_output": {
+    "intent": "add|fix|refactor|migrate|remove|other",
+    "target": "...",
+    "scope_hint": "single-file|subsystem|multi-system",
+    "constraints": ["..."],
+    "acceptance": "..."
+  }
 }
 ```
 
-- `intent`, `target`, `scope_hint` 은 **필수**.
-- `constraints` 는 배열 — 유저가 언급하지 않았으면 빈 배열.
-- `acceptance` 는 선호되지만 필수 아님 — 유저가 말하지 않았으면 `null`.
-- `request` 는 **원 유저 턴을 그대로** — 구조화 필드에서 빠진 뉘앙스를 하위 writer 가 다시 읽어본다.
+`harness-flow.yaml` 기준 라우팅:
 
-**피벗** — 명확화 도중 유저가 이 요청을 떠나 다른 요청으로 전환. Dispatcher 는 현재 세션을 그대로 두고 다음 턴에 router 가 재발화하게 한다:
+- `prd-trd` → `prd-writer` → `trd-writer` → `task-writer`
+- `prd-only` → `prd-writer` → `task-writer`
+- `trd-only` → `trd-writer` → `task-writer`
+- `tasks-only` → `task-writer`
+
+`brainstorming_output` 은 router 가 `plan` 을 바로 인계해서 Q&A 단계가 생략된 경우 (intent 만 요청 동사에서 추론) `null` 일 수 있다.
+
+**피벗** — 인테이크 도중 유저가 다른 요청으로 전환. Dispatcher 는 현재 세션을 그대로 두고 다음 턴에서 router 가 재발화하게 한다:
 
 ```json
-{ "outcome": "pivot", "session_id": "2026-04-19-...", "reason": "user asked about dashboard UI mid-clarification" }
+{ "outcome": "pivot", "session_id": "2026-04-19-...", "reason": "user asked about dashboard UI mid-intake" }
 ```
 
-**Casual 재분류** — 한 라운드 돌고 보니 유저가 작업 요청이 아니라 질문을 한 상황. Dispatcher 는 드롭하고 다음 턴을 router 가 처리하게 한다:
+**Casual 재분류** — 알고 보니 유저가 작업 요청이 아니라 질문을 한 상황. Dispatcher 는 드롭하고 다음 턴을 router 가 처리하게 한다:
 
 ```json
 { "outcome": "exit-casual", "session_id": "2026-04-19-...", "reason": "user was browsing, not requesting work" }
 ```
 
-세 outcome 모두 trace 를 위해 `STATE.md` 의 `Last activity` 는 갱신. ROADMAP 은 brainstorming 이 건드리지 않는다.
+세션 파일은 경로 outcome (`prd-trd` / `prd-only` / `trd-only` / `tasks-only`) 에서만 갱신 — Step B7 참조. `STATE.md` 의 `Last activity` 라인은 모든 outcome 에서 갱신 (trace). `pivot` / `exit-casual` 은 ROADMAP 을 건드리지 않는다.
 
 ## 프로세스 흐름
 
 ```
-┌─────────────────────────────────┐
-│ Step 1 — 추출 + 범위 평가        │
-└─────────────┬───────────────────┘
-              │
-     ┌────────┴────────┐
-     │ 다중 프로젝트?    │──yes──▶ 분해 제안
-     └────────┬────────┘              │
-              │no                     │ 유저가 서브 프로젝트 선택
-              ▼                       ▼
-┌─────────────────────────────────────────┐
-│ Step 2 — 빈 필드 질문 (턴당 하나)        │◀─┐
-└─────────────┬───────────────────────────┘  │
-              │                              │
-    ┌─────────┴──────────┐                   │
-    │ 유저 "그냥 시작"?   │──yes──▶ Step 3 조기 종료
-    └─────────┬──────────┘                   │
-              │no                            │
-              ▼                              │
-      ┌───────────────┐                      │
-      │ 필수 필드 다   │──no──────────────────┘
-      │ 찼는가?        │
-      └───────┬───────┘
-              │yes
-              ▼
-┌──────────────────────────────────┐
-│ Step 4 — 확인 + payload emit     │
-└──────────────────────────────────┘
+                         ┌──────────────────────────────┐
+                         │ Step 0 — 재개 숏서킷            │
+                         └──────────────┬───────────────┘
+                                        │
+                         ┌──────────────┴──────────────┐
+                         │ route == "clarify"?          │
+                         └──────────────┬──────────────┘
+                            yes         │           no (plan/resume)
+              ┌─────────────────────────┘                       │
+              ▼                                                 │
+┌──────────────────────────────────────┐                       │
+│ Phase A — 명확화 (Q&A 루프)           │                       │
+│   A1. 추출 + 범위 평가                  │                       │
+│   A2. 빈 필드 질문 (턴당 하나)            │                       │
+│   A3. 유저 "그냥 시작" 시 조기 종료        │                       │
+│   A4. 명확화 확인                       │                       │
+└─────────────────────┬────────────────┘                       │
+                      │                                         │
+                      └────────────────┬────────────────────────┘
+                                       ▼
+            ┌──────────────────────────────────────────┐
+            │ Phase B — 분류 + Gate 1                   │
+            │   B1. 신호 탐지                            │
+            │   B2. 파일 수 추정                          │
+            │   B3. 경로 판정                             │
+            │   B4. tasks-only 자기검증                   │
+            │   B5. Gate 1 — 추천 제시                    │
+            │   B6. 응답 처리 (수락/번복)                  │
+            │   B7. 확정 + 경로 payload emit              │
+            └───────────────────────────────────────────┘
 ```
 
 ## 절차
 
-### Step 1 — 추출 후 범위 평가
+### Step 0 — 재개 숏서킷
+
+`resume: true` 이면 `.planning/{session_id}/ROADMAP.md` 를 읽는다. `Complexity: X` 줄 (X ∈ prd-trd / prd-only / trd-only / tasks-only) 이 있고 **동시에** `brainstorming` phase 가 `[x]` 면 **다시 인테이크하지 않는다**. `harness-flow.yaml` 의 다음 미완료 phase 로 향하는 경로 payload 를 emit 하고 종료. 근거: 지난 세션에서 이미 결정한 경로를 다시 묻는 건 턴을 낭비하고 신뢰를 깎는다.
+
+`resume: true` 인데 분류 기록이 없으면 (예: Gate 1 중간에 끊긴 세션) Phase A 를 건너뛰고 Phase B 부터 정상 진행 (router 가 `resume` 으로 분류했다는 건 사전 신호가 충분하다는 뜻).
+
+### Phase A — 명확화 (`route == "clarify"` 일 때만)
+
+`route == "plan"` 또는 `route == "resume"` 이면 **Phase A 는 통째로 스킵**하고 B1 부터 시작. Router 가 이미 신호가 충분하다고 판정했으므로 재질의는 작업 중복이다.
+
+#### A1 — 추출 후 범위 평가
 
 뭐라도 묻기 전에 순서대로 둘 다:
 
-**(a) 요청에 이미 있는 것부터 채운다.** `request` 를 읽고 체크리스트에서 이미 확정된 필드를 채운다. **진짜 빈 곳만** 물어본다. 요청에 답이 이미 있는 질문을 다시 던지는 건 명확화 스킬의 가장 흔한 실패 패턴이다. 유저가 "refactor the DB layer for clarity" 라고 썼다면 `intent=refactor`, `target=DB layer` 는 이미 찬 상태 — 다시 묻지 않는다.
+**(a) 요청에 이미 있는 것부터 채운다.** `request` 를 읽고 actionability 체크리스트 (`intent`, `target`, `scope_hint`, `constraints`, `acceptance`) 에서 이미 확정된 필드를 채운다. **진짜 빈 곳만** 물어본다. 요청에 답이 이미 있는 질문을 다시 던지는 건 명확화 단계의 가장 흔한 실패 패턴이다. 유저가 "refactor the DB layer for clarity" 라고 썼다면 `intent=refactor`, `target=DB layer` 는 이미 찬 상태 — 다시 묻지 않는다.
 
-**(b) 범위 평가 — 한 세션인가 여러 세션인가?** 요청이 독립적인 여러 서브시스템을 기술하면 (예: "채팅·파일 스토리지·결제·분석이 있는 플랫폼 구축"), 필드 질문에 들어가기 **전에 즉시 플래그** 한다. 유저에게 분해를 제안:
+**(b) 범위 평가 — 한 세션인가 여러 세션인가?** 요청이 독립적인 여러 서브시스템을 기술하면 (예: "채팅·파일 스토리지·결제·분석이 있는 플랫폼 구축"), 필드 질문에 들어가기 **전에 즉시 플래그**한다. 분해 제안:
 
 > "이건 여러 개의 독립된 서브 프로젝트로 보입니다: {리스트}. 한 세션은 하나의 일관된 조각을 소유해야 합니다. 어떤 것부터 시작하시겠어요? 나머지는 별도 세션이 됩니다."
 
-유저가 하나를 고르면 payload 의 `request` 를 그 서브 프로젝트 설명으로 교체하고 진행한다. 나머지 서브 프로젝트는 미래 세션이 된다 — 각 세션마다 router 가 새로 돈다.
+유저가 하나를 고르면 payload 의 `request` 를 그 서브 프로젝트 설명으로 교체하고 진행. 나머지 서브 프로젝트는 미래 세션이 된다 — 각 세션마다 router 가 새로 돈다.
 
-유저가 다 한 세션에서 처리하자고 고집하면 진행하되 `constraints: ["deliberately-wide-scope"]` 를 기록해서 `complexity-classifier` 가 prd-trd 쪽으로 기울게 한다.
+유저가 다 한 세션에서 처리하자고 고집하면 진행하되 `constraints: ["deliberately-wide-scope"]` 를 기록해서 Phase B 가 prd-trd 쪽으로 기울게 한다.
 
-명백히 단일 범위의 요청은 범위 체크를 생략 — "src/auth/session.ts 의 로그인 타임아웃 버그 수정" 같은 요청에 "이게 하나의 프로젝트인가요?" 를 묻지 말 것.
+명백히 단일 범위의 요청은 범위 체크 생략 — "src/auth/session.ts 의 로그인 타임아웃 버그 수정" 같은 요청에 "이게 하나의 프로젝트인가요?" 를 묻지 말 것.
 
-### Step 2 — 빈 필드를 한 번에 하나씩 묻는다
+#### A2 — 빈 필드를 한 번에 하나씩 묻는다
 
-우선순위 — **첫 번째 빈 필드부터 질문하되, 반드시 Step 1(a) 를 최신 답변 위에 다시 돌린 뒤에**. 유저 답 하나가 여러 필드를 동시에 채우는 경우가 흔하다 (예: "refactor session handling for clarity" → intent + target + 부분 scope 동시 충족). 매 턴마다 대화 전체를 재추출한 뒤 다음 질문을 고른다. 목록을 위→아래로 맹목적으로 타지 말 것.
+우선순위 — **첫 번째 빈 필드부터 질문하되, 반드시 A1(a) 를 최신 답변 위에 다시 돌린 뒤에**. 유저 답 하나가 여러 필드를 동시에 채우는 경우가 흔하다 (예: "refactor session handling for clarity" → intent + target + 부분 scope 동시 충족). 매 턴마다 대화 전체를 재추출한 뒤 다음 질문을 고른다. 목록을 위→아래로 맹목적으로 타지 말 것.
 
-1. **intent** — 보통 추론 가능. 애매할 때만: "Sounds like this is about {후보}. Which fits best?" MC 제시: add / fix / refactor / migrate / remove / other. 유저의 동사가 다섯 개 중 어디에도 안 맞으면 `intent: "other"` 로 두고 **함께** `constraints` 에 `"intent-freeform: <동사>"` 를 추가 — 하위가 원 동사를 볼 수 있어야 한다.
+1. **intent** — 보통 추론 가능. 애매할 때만: "Sounds like this is about {후보}. Which fits best?" MC: add / fix / refactor / migrate / remove / other. 유저의 동사가 다섯 개 중 어디에도 안 맞으면 `intent: "other"` 로 두고 **함께** `constraints` 에 `"intent-freeform: <동사>"` 를 추가 — Phase B 가 원 동사를 볼 수 있어야 한다.
 2. **target** — "코드베이스의 어느 부분에 해당하나요?" 열린 질문, 후보가 보이면 MC.
 3. **scope_hint** — "한 곳에 갇힌 변경인가요, 한 서브시스템 내인가요, 아니면 크로스-시스템인가요?" MC: single-file / subsystem / multi-system.
 4. **constraints** — 컨텍스트에서 **그럴듯한 제약이 짚어질 때만** 묻는다. 예 (인증 변경 요청): "기존 세션에 대한 하위 호환 요구 있나요?" 막연한 프롬프트로 제약을 낚지 않는다.
@@ -124,42 +148,145 @@ Clarification 단계가 없으면 router 의 `clarify` 버킷이 `complexity-cla
 
 규칙:
 
-- **턴당 질문 하나.** 묶음 금지. 질문 폭격은 우리가 피하려는 anti-pattern.
+- **턴당 질문 하나.** 묶음 금지.
 - **가능하면 객관식.** 유저는 MC 를 더 빠르고 정확하게 답한다.
-- **유저 언어로 질문.** 스킬 본문·필드명·규칙은 영어로 두되, 유저 대화는 유저 언어를 미러링. 유저가 한국어면 한국어로 묻는다. Router 와 같은 규범.
-- **질문에도 YAGNI.** 라우팅·드래프팅에 필요한 것만 묻는다. 어떤 답이 와도 하위 라우팅이나 writer 의 초안을 바꾸지 않는 질문이면 묻지 말 것.
+- **유저 언어로 질문.** 스킬 본문·필드명·규칙은 영어로 두되, 유저 대화는 유저 언어를 미러링.
+- **질문에도 YAGNI.** 분류와 드래프팅에 필요한 것만 묻는다. 어떤 답이 와도 경로나 writer 의 초안을 바꾸지 않는 질문이면 묻지 말 것.
 - **필수 필드 채워지면 중단.** 선택 필드가 비어도 괜찮다.
 
-### Step 3 — 조기 종료
+#### A3 — 조기 종료
 
-유저가 "그냥 시작", "일단 가자", "스킵", "너가 알아서" 비슷한 말을 하면 **즉시 중단**하고 현재 채워진 필드로 인계한다. 건너뛴 필드는 `STATE.md` 의 `Last activity` 에 기록해서 하위가 payload 가 얇음을 알게 한다:
+유저가 "그냥 시작", "일단 가자", "스킵", "너가 알아서" 비슷한 말을 하면 **즉시 중단**하고 현재 채워진 필드로 Phase B 진입. 건너뛴 필드는 `STATE.md` 의 `Last activity` 에 기록해서 하위가 payload 가 얇음을 알게 한다:
 
 ```
-Last activity: 2026-04-19 13:44 — brainstorming exit (user-skip); missing: acceptance
+Last activity: 2026-04-19 13:44 — brainstorming clarify exit (user-skip); missing: acceptance
 ```
 
-얇은 payload 는 실패가 아니다 — "정확성보다 속도" 라는 유저 신호다. Classifier 와 writer 는 빈 필드가 실제로 블로킹되는 순간에 자기가 좁은 범위로 다시 물어본다.
+얇은 payload 는 실패가 아니다 — "정확성보다 속도" 라는 유저 신호다. Phase B 와 writer 는 빈 필드가 실제로 블로킹되는 순간에 자기가 좁은 범위로 다시 물어본다.
 
-### Step 4 — 확인 후 emit (`outcome: "clarified"` 경로)
+#### A4 — 확인 후 진행
 
 필수 체크리스트가 다 찼으면 **짧은 한 문단으로 확인** — 유저 언어로:
 
-> "Got it — {intent} {target}, {scope_hint}. {constraint 요약이 있다면}. {acceptance 가 있다면}. Passing to classifier."
+> "확인 — {intent} {target}, {scope_hint}. {constraint 요약이 있다면}. {acceptance 가 있다면}. 이제 경로를 고르겠습니다."
 
-확인 메시지는 **독립된 한 메시지** — JSON 을 같이 묶지 않는다. **다음** 유저 턴에서 수락 ("네", "좋아요", 무응답/정정 없음) 이면 `clarified` payload 를 메시지로 emit 하고 스킬 종료. 필드를 고치면 Step 2 의 **그 필드만** 으로 돌아가서 재확인 — 이미 옳게 답한 필드는 다시 묻지 않는다. 수정 ≠ 재시작. 유저가 대신 피벗하거나 질문이었음을 드러내면 `pivot` 또는 `exit-casual` payload 를 emit 하고 종료 (엣지 케이스 참조).
+확인 메시지는 **독립된 한 메시지** — 경로 추천을 같이 묶지 않는다. **다음** 유저 턴에서:
+
+- 수락 ("네", "좋아요", 무응답/정정 없음) → Phase B 로 진입 (B1 부터).
+- 필드 정정 → A2 의 **그 필드만** 으로 돌아가서 재확인. 수정 ≠ 재시작; 이미 옳게 답한 필드는 다시 묻지 않는다.
+- 피벗 또는 질문이었음 드러내기 → `pivot` / `exit-casual` payload emit (엣지 케이스 참조) 후 종료.
+
+### Phase B — 분류 + Gate 1
+
+#### B1 — 신호 탐지
+
+두 종류의 신호:
+
+**(a) 경로 신호 — 리터럴, 언어 무관.** `request`, `target`, `constraints` 에서 다음 파일 경로 패턴을 스캔:
+
+- `auth/`, `security/` — 인증·인가
+- `schema.*`, `*/schema/` — DB 또는 API 스키마
+- `migrations/` — DB 마이그레이션
+- `package.json`, `*/package.json` — 의존성·버전 변경
+- `config.ts`, `*.config.*` — 전역 설정
+
+경로는 파일시스템 리터럴 — 어떤 언어든 동일하게 매칭. 히트는 `signals_matched: ["path:auth/", ...]` 로 기록.
+
+**(b) 키워드 신호 — 의미론적, 다국어.** 요청이 다음 개념 중 하나를 의미론적으로 가리키는지 판단: 인증, 로그인, 비밀번호, 세션, DB, 스키마, 마이그레이션, 설정, 의존성. 리터럴 문자열이 아니라 개념 — "로그인", "認証", "authentification" 모두 auth/login 개념으로 센다. 고정 키워드 테이블이 아니라 판단으로. 히트는 `signals_matched: ["keyword:login", ...]` 로 기록.
+
+**(c) `deliberately-wide-scope` 제약** (Phase A 에서 멀티서브시스템을 발견했는데 유저가 그대로 가자고 한 플래그): **암묵적 prd-trd 신호**. `signals_matched: ["constraint:deliberately-wide-scope"]` 로 기록.
+
+#### B2 — 파일 수 추정
+
+정수 하나 N — 수정 + 신규 파일의 베스트-게스 합계.
+
+Calibration:
+
+- 오타 / 포맷 / 주석만 → 1
+- 단일 서브시스템 버그 수정 → 1–3
+- 엔드포인트 하나 또는 페이지 하나 신규 → 2–4
+- 여러 레이어 걸친 기능 → 5–12
+- 크로스-커팅 마이그레이션 / 프레임워크 교체 → 10–30+
+
+과하게 생각하지 않는다. 대략의 정수 하나면 충분 — B6 에서 유저가 번복 가능. 추정조차 불가능할 정도로 요청이 모호하고 (Phase A 도 안 돌아서 `target` 이 없음) N=3 중립값으로 두고 Gate 1 메시지에 low-confidence 표시.
+
+#### B3 — 경로 판정
+
+순서대로 적용:
+
+1. `signals_matched` 에 어떤 엔트리든 있으면 → **prd-trd 후보** (파일 수 무관).
+2. 그 외, intent 별:
+   - `add` / `create` + N ≥ 5 → **prd-trd**
+   - `add` / `create` + N < 5 → **prd-only**
+   - `refactor` / `migrate` / `remove` → **trd-only**
+   - `fix` + N ≤ 2 → **tasks-only 후보** (B4 통과 필요)
+   - `other` + `constraints` 에 `intent-freeform` → freeform 동사 파싱: refactor-ish → trd-only, fix-ish → tasks-only 후보, create/add-ish → N ≥ 5 면 prd-trd 아니면 prd-only. 해석 불가 → prd-only.
+   - `other` 또는 intent 없음 (freeform 단서도 없음) → **prd-only** (보수적 — 경량 PRD 는 잘못된 경로보다 싸다).
+
+#### B4 — tasks-only 자기검증
+
+B3 에서 tasks-only 후보가 나왔을 때만 실행. 네 개 모두 체크:
+
+- [ ] 명백한 버그 수정 / 오타 / 포맷 / 주석 수준인가?
+- [ ] 예상 파일 ≤ 2 인가?
+- [ ] 보안·아키텍처 신호 매칭 없는가?
+- [ ] 요청에 "설계 필요" 단서 (새 용어 / 의도 모호 / 새 개념 언급) 가 없는가?
+
+**하나라도 실패 → prd-only 로 승격**. 전부 통과 → tasks-only 유지. 근거: "단순해 보이는" 작업이야말로 검증되지 않은 가정이 가장 많이 쌓이는 곳 — 이 게이트는 모델이 설계를 우회하도록 합리화하는 걸 막기 위한 것.
+
+#### B5 — Gate 1 — 추천 제시
+
+유저 언어로, **독립된 턴 한 개 메시지**로 전달:
+
+> "**{route}** ({expansion}) 추천. 예상 {N}파일. {신호 요약 또는 '보안·아키텍처 신호 없음'}. 진행할까요?"
+
+예시:
+
+- `"prd-only (PRD → Tasks) 추천. 예상 3파일, 보안 신호 없음. 진행할까요?"`
+- `"prd-trd (PRD → TRD → Tasks) 추천. 예상 4파일, auth/ 를 건드림 (보안 민감). 진행할까요?"`
+- `"tasks-only 추천. 오타 수정, 1파일, 신호 없음. 설계 건너뛰고 바로 태스크로 갈까요?"`
+
+이 메시지는 **단독** — 출력 JSON 을 같이 붙이지 않는다. MC 는 암묵적으로 제시: 수락 / 경로 변경 / 파일 수 조정. 이보다 더 묶지 않는다.
+
+#### B6 — 응답 처리 (다음 유저 턴)
+
+**다음** 유저 턴 응답을 네 액션 중 하나로 분류:
+
+- **수락** ("네", "진행", 무응답/정정 없음) → B7 로, 현재 경로 유지. `user_overrode: false`.
+- **경로 번복** ("prd-trd 로 해줘" / "그냥 tasks-only") → B7 로, 유저 경로. `user_overrode: true`. 반박하지 않는다.
+- **파일 수 번복** ("10파일쯤일 듯") → 새 N 으로 B3 재실행, B5 로 한 번만 돌아가서 새 추천 제시. 이 루프만 허용.
+- **피벗 또는 casual** — 아래 Pivot handling 참조.
+
+`intent` / `target` / `scope_hint` 에 대한 명확화 질문은 **여기서 하지 않는다** — Phase A 의 일이었다. 빠져 있고 중요해 보이면 보수적 경로 (add 쪽이면 prd-only, refactor 쪽이면 trd-only) 로 넘기고 writer 단계에서 보강한다.
+
+**Pivot handling.** 유저가 관련 없는 주제를 꺼내거나 현재 요청을 완전히 놓으면, 터미널 payload 로 `{"outcome": "pivot", ...}` emit 후 "새 요청으로 보입니다; 라우팅으로 돌아갑니다." 한 문장으로 종료. ROADMAP/STATE **갱신 금지**. 대신 유저 응답이 "경로에 대한 질문이었지 작업 요청이 아님" 을 드러내면 `{"outcome": "exit-casual", ...}` emit 후 한 줄 인정으로 종료.
+
+#### B7 — 확정 + emit (경로 outcome 전용)
+
+수락 (번복 포함) 시:
+
+1. **`ROADMAP.md` 갱신**:
+   - 상단 근처에 `Complexity: {route} ({expansion})` 줄 추가/갱신.
+   - `- [ ] brainstorming` → `- [x] brainstorming    → {route} (approved)`. `user_overrode` 면 `→ {route} (overridden from {recommended-route})` 로 표기. user_overrode 플래그는 이 한 줄 우측 라벨에만 산다 — 별도 `gate-1-approval` 체크박스는 두지 않는다 (Gate 1 이 brainstorming 에 흡수돼 두 줄로 표현하면 중복).
+2. **`STATE.md` 갱신**:
+   - `Current Position: {harness-flow.yaml 기준 다음 phase}`
+   - `Last activity: {ISO 타임스탬프} — classified as {route}{, 필요 시 user-overrode}`
+3. **경로 payload 를 마지막 메시지로 emit** — `outcome` 은 경로 이름. 메인 스레드가 `harness-flow.yaml` 의 `when:` 식을 평가해 맞는 writer agent 로 dispatch.
 
 ## 이 스킬이 하지 않는 것
 
 - 해결책·접근법·트레이드오프 제안 — `prd-writer` / `trd-writer` 의 몫.
-- 복잡도 티어 결정·협상 — `complexity-classifier` 의 몫.
-- 스펙·디자인·플랜 문서 작성 — Phase 4 아티팩트.
+- 스펙·디자인·플랜 문서 작성 — 하위 아티팩트.
 - 코드베이스 탐색 — **target 이름 모호성 해소에 꼭 필요한 최소한** (예: 유저가 언급한 파일이 실존하는지 확인) 외엔 안 한다. 이것도 tool call 2회 넘어가면 멈추고 유저에게 물어본다.
-- `ROADMAP.md` 수정. 이 스킬은 `STATE.md` 의 `Last activity` 한 줄만 쓴다.
-- 유저가 이번 턴에 이미 답한 것을 다시 묻는 행위.
+- LOC / 테스트 커버리지 추정 — 요청 시점에는 알 수 없는 값이라 분류 신호에서 제외.
+- 런타임 중간 승격 (실제 diff 보고 경로 상향) — 이 스킬의 범위 밖.
+- 다음 agent 직접 dispatch — 메인 스레드가 emit 된 `outcome` 을 읽고 `harness-flow.yaml` 을 따라 진행.
+- 파일 수 추정을 위한 코드베이스 탐색 — 추정은 요청 텍스트만으로. 정말 모를 요청은 N=3 기본값 + low confidence.
+- 유저가 이미 답한 질문 되묻기.
 
 ## 대화 모양
 
-좋은 예 — 턴당 질문 하나, MC 선호, 짧은 확인으로 마감:
+**좋은 예 — clarify 경로, 인테이크 거쳐 trd-only:**
 
 > User: "make the auth code better"
 > Brainstorming: "어떤 변경이 필요하신가요? (버그 수정 / 가독성 리팩토링 / 성능 개선 / 마이그레이션)"
@@ -168,38 +295,79 @@ Last activity: 2026-04-19 13:44 — brainstorming exit (user-skip); missing: acc
 > User: "세션 처리"
 > Brainstorming: "범위: 세션 모듈 안에 갇히나요, 호출자까지 번지나요?"
 > User: "모듈 안에만"
-> Brainstorming: "확인 — 세션 처리 리팩토링, subsystem 범위. Classifier 로 넘깁니다."
+> Brainstorming: "확인 — 세션 처리 리팩토링, subsystem 범위. 이제 경로를 고르겠습니다."
+> User: "ok"
+> Brainstorming: "**trd-only** (TRD → Tasks) 추천. 예상 3파일, 보안 신호 없음. 진행할까요?"
+> User: "네"
+> Brainstorming: [ROADMAP 확정, `{"outcome": "trd-only", ...}` emit]
 
-좋은 예 — 필드 파기 전에 다중 프로젝트를 잡아내는 경우:
+**좋은 예 — plan 경로 (Phase A 스킵), 신호 승격:**
+
+> Router output: `{outcome: "plan", request: "로그인에 2FA 추가", session_id: "..."}`
+> Brainstorming: [Phase A 스킵; B1 이 `auth/` + `keyword:login` 히트]
+> Brainstorming: "**prd-trd** (PRD → TRD → Tasks) 추천. 예상 4파일, `auth/` 를 건드림 (보안 민감). 진행할까요?"
+> User: "좋아"
+> Brainstorming: [확정, `{"outcome": "prd-trd", ...}` emit]
+
+**좋은 예 — tasks-only 자기검증 실패 후 prd-only 로 강등:**
+
+> 요청: "로그인의 세션 만료 버그 수정"
+> intent: fix, N=2 — tasks-only 후보 → B1 이 `auth/` 히트 → prd-only 승격
+> Brainstorming: "처음엔 tasks-only 수정으로 보였는데 `auth/` 를 건드립니다 — 대신 **prd-only** (PRD → Tasks) 추천. 2파일. 진행할까요, prd-trd 로 승격할까요?"
+
+**좋은 예 — 유저 경로 번복:**
+
+> Brainstorming: "prd-only 추천…"
+> User: "아니 그냥 tasks-only 로, 한 줄짜리야"
+> Brainstorming: "알겠습니다 — tasks-only, 유저 번복. 설계 건너뛰고 task-writer 로 진행."
+> [`user_overrode: true` 로 확정]
+
+**좋은 예 — 필드 파기 전에 다중 프로젝트를 잡아냄:**
 
 > User: "리드 / 딜 / 리포팅 / 이메일 통합 / 모바일 앱이 있는 완전한 CRM 을 만들자"
-> Brainstorming: "이건 여러 서브 프로젝트로 보입니다: 리드/딜 관리, 리포팅, 이메일 통합, 모바일 앱. 한 세션은 하나의 일관된 조각을 소유해야 합니다 — 어떤 것부터 시작하시겠어요? 나머지는 별도 세션으로."
+> Brainstorming: "이건 여러 서브 프로젝트로 보입니다: 리드/딜 관리, 리포팅, 이메일 통합, 모바일 앱. 한 세션은 하나의 일관된 조각을 소유해야 합니다 — 어떤 것부터 시작하시겠어요?"
 
-나쁜 예 — 질문 폭격:
+**나쁜 예 — 질문 폭격:**
 
 > Brainstorming: "다음을 알려주세요: (1) intent, (2) target, (3) scope, (4) constraints, (5) acceptance — 다섯 개 다 부탁합니다."
 
-나쁜 예 — 접근법 제안 (이 스킬의 일이 아니다):
+**나쁜 예 — 접근법 제안:**
 
 > Brainstorming: "세 가지 방법이 있습니다: A) 이름만 바꾸기 B) 함수 추출 C) 전면 재작성. 뭐가 좋을까요?"
 
-나쁜 예 — 요청에 이미 있는 걸 되묻기:
+**나쁜 예 — 요청에 이미 있는 걸 되묻기:**
 
 > User 요청: "fix the login timeout bug in src/auth/session.ts"
 > Brainstorming: "어떤 종류의 변경인가요?"
-> (intent / target / scope 가 요청에 다 있음 — acceptance 물어보거나 바로 종료)
+> (intent / target / scope 가 요청에 다 있음 — 바로 acceptance 또는 경로 추천으로)
+
+**나쁜 예 — 조용한 확정 (Gate 1 은 반드시 명시적):**
+
+> Brainstorming: [유저에게 묻지 않고 ROADMAP 에 쓰기]
+
+**나쁜 예 — 유저 번복에 반박:**
+
+> User: "그냥 tasks-only 로"
+> Brainstorming: "확실한가요? auth/ 를 건드려서 prd-trd 를 권장하는데, 재고해 주시겠어요?" ← 유저가 이미 결정함; `user_overrode: true` 기록하고 진행
 
 ## 엣지 케이스
 
-- **대화 중 유저 피벗** (인증 리팩토링 명확화하다가 갑자기 대시보드 UI 얘기): `{"outcome": "pivot", ...}` 을 터미널 payload 로 emit 하고 한 문장으로 마감 — "새 요청으로 보입니다; 라우팅으로 돌아갑니다." 다음 유저 턴에서 router 가 다시 트리거되어 새 세션을 할당한다.
-- **새 모호성을 포함한 답변** (예: "인증도 건드리고 결제 쪽도 조금"): `scope_hint: multi-system` 으로 흡수하고 추가 질문 없음. 모호성 자체가 정보다.
-- **질문과 무관한 답변** (예: 범위 MC 에 코드 스니펫으로 답): 질문을 한 번 인용하며 재질문. 두 번째도 빗나가면 보수적 기본값 `scope_hint: multi-system` 으로 두고 진행 — 과도한 질문이 과도한 범위 책정보다 나쁘다.
-- **알고 보니 casual** (한 라운드 돌고 나서 작업 요청이 아니라 질문이었음이 드러남): `{"outcome": "exit-casual", ...}` 을 터미널 payload 로 emit 하고 한 문장으로 인지하며 종료. `Last activity: brainstorming exit (reclassified-casual)` 로 기록.
-- **유저가 자발적으로 분해** (예: "응, 리드부터 하자, 딜은 다음에"): 수락하고 선택된 서브 프로젝트를 `request` 로 캡처, 후속 작업은 `constraints` 에 `"followup-sessions: deals, reporting"` 로 기록 — 유저가 원한 건 속도이지 범위 협상이 아니다.
+- **대화 중 유저 피벗** (인증 리팩토링 명확화하다가 갑자기 대시보드 UI): `{"outcome": "pivot", ...}` 터미널 emit + "새 요청으로 보입니다; 라우팅으로 돌아갑니다." 한 문장 종료. 다음 턴 router 가 새 세션 할당.
+- **Phase A 답변에 새 모호성** (예: "인증도 건드리고 결제 쪽도 조금"): `scope_hint: multi-system` 으로 흡수. 모호성 자체가 정보다.
+- **Phase A 답변이 무관** (범위 MC 에 코드 스니펫 등): 질문을 한 번 인용하며 재질문. 두 번째도 빗나가면 보수적 기본값 `scope_hint: multi-system` 으로 두고 진행.
+- **알고 보니 casual** (한 라운드 돌고 보니 작업 요청이 아니라 질문): `{"outcome": "exit-casual", ...}` emit + 한 문장 인지 후 종료. `Last activity: brainstorming exit (reclassified-casual)` 로 기록.
+- **유저 자발적 분해** (예: "응, 리드부터 하자, 딜은 다음에"): 수락하고 선택된 서브 프로젝트를 `request` 로 캡처, 후속을 `constraints` 에 `"followup-sessions: deals, reporting"` 로 기록.
+- **Router → plan 직송** (Phase A 스킵): `request` 의 첫 동사에서 `intent` 추론. 명확하지 않으면 `add` 기본. 유저에게 묻지 않는다 — 플로우 간결성.
+- **기존 분류 있는 재개** (Step 0): 다음 `[ ]` phase 로 향하는 경로 payload emit. Gate 1 재질의 금지.
+- **신호 충돌** (예: `migrations/` + "한 줄 오타"): prd-trd 쪽 편향. 사소한 마이그레이션을 과대 스코핑하는 비용은 5분짜리 PRD, 과소 스코핑하는 비용은 깨진 스키마.
+- **유저가 파일 수만 주고 경로는 미정** ("8파일쯤?"): 조용히 경로 재계산, 새 추천 한 번 더 제시.
+- **유저가 없는 경로 지명** ("prd-tasks 로"): 네 옵션으로 한 번 재질의. 여전히 불명확하면 추천 경로 사용.
+- **`intent: "other"` + `intent-freeform`**: freeform 동사 파싱 — refactor-ish → trd-only, fix-ish → tasks-only 후보, create-ish → prd-trd/prd-only. 해석 불가면 prd-only 기본.
 
 ## 경계
 
-- 코드 쓰기 금지. 파일 생성은 `STATE.md` `Last activity` 업데이트 외 금지.
-- `complexity-classifier` 외로의 인계 금지.
-- Router 재호출 금지. 유저 피벗이 새 세션을 정당화하면 이 스킬은 종료 — 다음 턴에 router 가 돈다.
-- 스킬 내부 (규칙·필드명·예시·본 문서) 는 영어. 유저에게 던지는 질문·확인은 유저 언어를 미러링.
+- `ROADMAP.md` (Complexity 줄 + 체크박스 두 개) 와 `STATE.md` (Current Position + Last activity) 에만 쓴다. 다른 파일 금지.
+- 인계는 `harness-flow.yaml` 라우팅만 — writer agent 직접 호출 금지.
+- Router 재호출 금지. 유저 피벗이 새 세션을 정당화하면 이 스킬 종료 — 다음 턴에 router 가 돈다.
+- 스킬 내부 (경로명·신호 리스트·체크리스트·필드명·본 문서) 는 영어. 유저 추천·확인은 유저 언어 미러링.
+- B6 의 파일 수 재계산이 재시도 예산의 전부. 그 너머는 유저 값을 그대로 받고 진행.
