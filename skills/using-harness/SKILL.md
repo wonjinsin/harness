@@ -14,7 +14,7 @@ The harness is a chained planning + execution flow that turns a feature/bug requ
 
 ## Skill priority
 
-When a harness skill's "Required next skill" section names a follow-up, run it before any other skill the conversation might also match. Treat the chain as load-bearing — skipping a step (e.g. going straight from brainstorming to executor) breaks payload threading. The full per-edge payload graph lives in `harness-contracts/payload-contract.md`.
+When a harness skill's "Required next skill" section names a follow-up, run it before any other skill the conversation might also match. Treat the chain as load-bearing — skipping a step (e.g., going straight from brainstorming to executor) breaks the per-edge payload contract. The full graph lives in `harness-contracts/payload-contract.md`.
 
 ## Execution mode
 

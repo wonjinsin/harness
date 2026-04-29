@@ -75,10 +75,10 @@ On `outcome: "blocked"` / `"failed"` / `"error"`: flow terminates. Report the fa
 ## Anti-patterns
 
 - **Do not re-dispatch a BLOCKED task.** Retry produces the same return. Escalate via the `blocked` outcome.
-- **Do not read other tasks' Acceptance when reviewing a return.** Cross-task coherence is the evaluator's job.
+- **Do not read _other_ tasks' Acceptance when reviewing a return.** Cross-task coherence is the evaluator's job, not the executor's. The current task's own Acceptance _is_ read — that is what "Do not let the subagent define its own Acceptance" below depends on. The boundary: this task's Acceptance, yes; sibling tasks' Acceptance, no.
 - **Do not silently skip a file overlap.** If detected, serialize explicitly — do not hope two subagents won't touch shared lines.
 - **Do not embed PRD/TRD content in the subagent prompt.** The task already quotes PRD/TRD verbatim; re-including invites reinterpretation drift.
-- **Do not let the subagent define its own Acceptance.** If `status: done` but evidence doesn't map to the task's Acceptance bullets, that is BLOCKED.
+- **Do not let the subagent define its own Acceptance.** If `status: done` but evidence doesn't map to the task's own Acceptance bullets, that is BLOCKED.
 - **Do not dispatch tasks across turns when they could be parallel.** All Task calls for one group go in **one assistant turn** — splitting serializes them.
 
 ## See also

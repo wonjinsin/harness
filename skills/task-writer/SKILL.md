@@ -61,7 +61,9 @@ One task = one PR-sized unit a fresh subagent can complete in one execution with
 
 Split: two files with no shared context; config/migration that must land before dependent code; refactor + behavior change in one commit. Don't split: a new file and its test; a function and its single caller (unless clearly different subsystems).
 
-3–8 tasks is healthy. <3 means bundled; >8 means over-split. When ≤2 files change, 1 task is often correct — do not manufacture structure.
+3–8 tasks is healthy for sessions touching multiple files or subsystems. <3 means bundled or under-decomposed; >8 means over-split.
+
+**Exception, takes precedence**: when the entire change is ≤2 files, 1 task is often correct — do not manufacture structure. A 1-file change with no natural subdivision is one task, not split into "task-1: edit" / "task-2: write test" which only serializes trivially. The 3–8 heuristic assumes substantial scope; trivial scope skips the heuristic.
 
 IDs: `task-1`, `task-2`, ... in topological order. Evaluator and executor reference by ID; renaming breaks state tracking.
 

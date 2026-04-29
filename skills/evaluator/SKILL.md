@@ -73,9 +73,9 @@ Count tasks by `Status` value: `done`, `failed`, `blocked`, `skipped`, `(no [Res
 - Any task has **two or more** `[Result]` blocks → `reason: "task-N has duplicate Result blocks — state corruption"`. parallel-task-executor's contract guarantees one per task; duplicates signal corruption.
 - `Status:` value is not one of `done|failed|blocked|skipped` → `reason: "task-N has unknown Status value: <value>"`.
 
-### Step 2 — Pre-check executor completion
+### Step 2 — Short-circuit on non-done executor (Track 2 skip)
 
-Before touching rules, decide whether executor's output is gate-able:
+Before touching rules, decide whether executor's output is gate-able. If any task did not reach `done`, short-circuit and skip Track 2 entirely — running rule checks on a half-implemented diff is noise.
 
 - **Any `Status: blocked`** → emit `escalate` with `reason` quoting the first blocked task's ID and `Reason:` line (e.g., `"task-4: Acceptance bullet 2 contradicts bullet 4"`). Do not read rules; do not run Track 2.
 - **Any `Status: failed`** → emit `escalate` with `reason` quoting the first failed task's ID and `Reason:` line. Do not run Track 2 — rules on a half-implemented diff are noise.
@@ -90,7 +90,7 @@ Otherwise:
 
 1. List `*.md` files directly under `rules_dir` (not recursive — rules are flat-per-project by convention). For each, read the file. If the first non-blank line contains `<!-- evaluator: skip -->`, exclude the file from the concatenated rules block.
 2. Run the configured diff command (default `git diff HEAD`). If the command errors or returns empty output, emit `{"outcome": "error", "session_id": "...", "reason": "diff command returned <empty|nonzero>: <stderr tail>"}`. An empty diff at evaluator time means the executor claimed `done` without modifying any file — that is a task-writer/executor bug, not a pass.
-3. Build the LLM prompt (see `## Rule validation prompt` below). Run it via your own reasoning — you are the LLM.
+3. Build the rule-judgment prompt (see `## Rule validation prompt` below) and apply it via your own reasoning. There is no separate model invocation here — the evaluator's outer-procedure reasoning and the rule judgment run in the same thread.
 4. Parse the response:
    - The **first non-blank line** must be exactly `PASS` or exactly `FAIL`. Trailing whitespace is allowed; anything else on that line → unparseable.
    - If `PASS`: any subsequent lines are treated as diagnostics (not violations) and ignored. The response is a pass.
@@ -114,7 +114,7 @@ The main thread owns STATE.md writes for `last_eval`, `last_eval_at`, `last_eval
 
 ## Rule validation prompt
 
-Use this structure for Step 3's LLM judgment. Treat it as an inner monologue — you are the model executing both the outer skill and this inner check:
+Use this structure for Step 3's rule judgment. The rule judgment runs in the same reasoning thread as the rest of this skill (not as a separate model call); treat the prompt below as an inner monologue:
 
 ```
 You will judge whether the following code diff violates any of the listed rules.
