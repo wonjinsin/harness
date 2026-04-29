@@ -28,6 +28,8 @@ function allowStop(reason) {
   process.exit(0);
 }
 
+debug('hook invoked');
+
 // 1. Read stdin
 let input;
 try {
