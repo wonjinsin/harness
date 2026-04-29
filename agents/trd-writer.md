@@ -1,6 +1,6 @@
 ---
 name: trd-writer
-description: Dispatched by the main thread when harness-flow.yaml routes a prd-trd (PRD→TRD) or trd-only (direct-to-TRD) session. Consumes the brainstorming or prd-writer payload and produces `.planning/{session_id}/TRD.md`.
+description: Dispatched by the main thread when brainstorming resolves a prd-trd (PRD→TRD) or trd-only route. Consumes the brainstorming or prd-writer payload and produces `.planning/{session_id}/TRD.md`.
 tools: Read, Write, Glob, Grep, Skill
 ---
 
