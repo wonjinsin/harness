@@ -1,6 +1,6 @@
 ---
 name: evaluator
-description: Use when a session's executor phase has finished and its output needs to be gated before doc-updater runs. Runs inside the evaluator agent's isolated context — main conversation history is NOT available. Reads `.planning/{session_id}/TASKS.md` `[Result]` blocks, project `.claude/rules/*.md`, and the current git diff; decides pass / escalate / error. No session-level retry loop — any non-pass is terminal.
+description: Use when an executor phase has finished in a harness session and its output must be gated before doc-updater. Runs in an isolated agent context with no main conversation history.
 ---
 
 # Evaluator
@@ -13,15 +13,6 @@ Gate the executor's output before `doc-updater` runs. Two things to verify:
 2. **Project rule compliance** (Track 2 per PRD §16) — the diff introduced by this session does not violate `<project>/.claude/rules/*.md`. Track 1 (mechanical, `make check`) already ran as a Stop hook before control reached here; this skill does not re-run commands.
 
 Outcomes route per `harness-flow.yaml`: `pass` → `doc-updater`, `escalate` → END (main thread writes `escalated: true` to STATE.md and surfaces the reason to the user), `error` → END (unrecoverable — payload defect or infra failure). There is no `fail` outcome and no loopback to executor; any non-pass condition terminates the session.
-
-## Why this exists
-
-The executor's job is coordination; it cannot tell whether the code it caused subagents to write is *right* in ways beyond each task's own Acceptance bullets. Cross-task coherence, project conventions, architectural fit, and the shape of the changes — those are the evaluator's surface. Two design pressures shape the skill:
-
-1. **Executor's state is ground truth, not re-derivable.** By the time evaluator runs, subagents have modified files and pushed `[Result]` blocks into TASKS.md. We read those blocks, we don't re-infer them. A `[Result: blocked]` block means a task that the task-writer wrote incorrectly. A `[Result: failed, Attempt: 3]` block means a task whose implementation exhausted its own retry budget. Neither is recoverable by re-dispatching executor (executor's resume rules skip already-terminal tasks), so we escalate.
-2. **Rule validation is LLM-judged, not rule-engine.** `.claude/rules/*.md` are natural-language norms ("no `console.log` in production", "bold PRD vocabulary stays bold"). We read them, read the diff, and let the agent judge. No DSL, no parser. Judgment failures that produce garbage `FAIL` output are caught as `error` — the main thread surfaces it to the user.
-
-Escalation is the honest response when nothing mechanical can improve the situation. The user then decides: edit TASKS.md, edit rules, or dismiss. The skill surfaces the signal via `escalated: true` in the outcome JSON; the main thread persists it to STATE.md.
 
 ## Input payload
 
@@ -38,29 +29,15 @@ If `tasks_path` is missing or unreadable, emit `error` at step-1. Do not guess.
 
 ## Output
 
-Emit a single JSON object. Three outcomes. Task-level details (which task blocked, which rule fired) stay in TASKS.md `[Result]` blocks and the diff itself — the user re-reads them. The JSON carries the top-level outcome, an optional `reason` (for non-pass cases), and the resolved `next` (see Step 5).
-
-**pass** — every task `[Result: done]` and (if rules exist) zero violations:
+Emit a single JSON object — your entire final message. No prose alongside.
 
 ```json
-{ "outcome": "pass", "session_id": "2026-04-19-...", "next": "doc-updater" }
+{ "outcome": "pass|escalate|error", "session_id": "2026-04-19-...", "reason": "<omit on pass>", "next": "doc-updater|null" }
 ```
 
-**escalate** — any non-pass condition the skill can classify (blocked task, Attempt:3 task, rule violation):
-
-```json
-{ "outcome": "escalate", "session_id": "2026-04-19-...", "reason": "task-4: Acceptance bullet 2 contradicts bullet 4", "next": null }
-```
-
-`reason` is a one-sentence human-readable summary suitable for the user-facing escalation message. It quotes the first blocker's `Reason:` for executor-blocked/failed cases, or `{rule-file}: {path:line} — {claim}` for rule-violation cases.
-
-**error** — payload defect or unrecoverable infrastructure issue (missing files, unreadable diff, LLM response not parseable, internally inconsistent state):
-
-```json
-{ "outcome": "error", "session_id": "2026-04-19-...", "reason": "TASKS.md not found at <path>", "next": null }
-```
-
-Never emit prose alongside the JSON. The JSON object is your entire final message.
+- `pass` — every task `[Result: done]` and (if rules exist) zero violations.
+- `escalate` — any classifiable non-pass condition (blocked task, Attempt:3 task, rule violation). `reason` quotes the first blocker's `Reason:` line, or `{rule-file}: {path:line} — {claim}` for rule violations.
+- `error` — payload defect or unrecoverable infra issue (missing files, unreadable diff, unparseable LLM response, internally inconsistent state).
 
 ## Procedure
 
@@ -131,17 +108,7 @@ Combine executor pre-check (Step 2) and rule result (Step 3):
 
 The main thread owns STATE.md writes for `last_eval`, `last_eval_at`, `last_eval_excerpt`, and (on escalate) `escalated: true`. This skill does **not** modify STATE.md — it emits the signal and lets the main thread persist it.
 
-### Step 5 — Resolve `next` and emit
-
-Perform the next-node lookup per `using-harness § Core loop` steps 3–5 against this skill's outgoing edges in `harness-flow.yaml`. Sole candidate: `doc-updater` (`when: $evaluator.output.outcome == 'pass'`):
-
-| `outcome` | doc-updater `when:` matches? | `next` |
-|---|---|---|
-| `pass` | yes | `doc-updater` |
-| `escalate` | no | `null` |
-| `error` | no | `null` |
-
-Emit the JSON with the resolved `next`. That is your entire final message.
+`next` is `doc-updater` when outcome is `pass`, else `null`.
 
 ## Rule validation prompt
 
@@ -249,31 +216,14 @@ Updated: 2026-04-21T10:05:00Z
 }
 ```
 
-### Example 4 — Escalate on executor-failed (Attempt:3 hit)
-
-TASKS.md contains task-3 with `Status: failed`, `Attempt: 3`, `Reason: repeated failure after narrow-scope retry`.
-
-```json
-{
-  "outcome": "escalate",
-  "session_id": "2026-04-19-add-2fa-login",
-  "reason": "task-3: repeated failure after narrow-scope retry (Attempt 3)",
-  "next": null
-}
-```
+The same shape applies when the source is `Status: failed` — only the `reason` differs (quote the `Attempt:3` line).
 
 ## Edge cases
 
 - **`rules_dir` absent or empty**: Track 2 skipped. Pass on rules alone (executor completion check still runs). `rules_dir` pointing to a file (not directory) is treated identically — skip.
-- **Diff empty but tasks claim `done`**: error outcome at step-3. A done task that produced zero diff is a lie; the main thread re-investigates (likely a task-writer `Files:` error that the subagent worked around by doing nothing).
-- **Diff enormous (thousands of lines)**: pass it through anyway. If judgment cost becomes prohibitive, the main thread's next revision can introduce a chunking strategy — for now, one judgment call per session.
-- **Rule file opts out** (`<!-- evaluator: skip -->` on the first non-blank line): file is not loaded into the concatenated rules block. If all rule files opt out, Track 2 passes trivially (equivalent to empty `rules_dir`).
-- **LLM self-judgment returns PASS with trailing diagnostics** (first line `PASS`, subsequent lines contain notes or partial observations): treat as PASS. Trailing lines are ignored — the strict parse rule is "first non-blank line exactly `PASS` or exactly `FAIL`". Stricter treatment of trailing content would only bounce good results into `error`.
-- **LLM response `FAIL` with no valid violation lines**: unparseable — emit `error` at step-3. `FAIL` without a concrete violation is meaningless.
-- **Duplicate `[Result]` blocks under one task**: corruption — emit `error` at step-1. Do not try to merge or pick one; the upstream contract is violated and the state is untrustworthy.
-- **`Status` value not in the allowed set** (e.g., `Status: partial`): error at step-1. parallel-task-executor only emits done/failed/blocked/skipped; anything else is corruption.
-- **Mixed done + skipped with no blocked/failed root**: internal inconsistency (Step 2 error branch).
-- **Request in non-English language**: rule files and diff contents stay verbatim; the skill frame (outcome JSON keys, step names) stays English. The `reason` field mirrors the rule file's language for rule-violation cases.
+- **Diff empty but tasks claim `done`**: error outcome at step-3. A done task that produced zero diff is a lie; the main thread re-investigates.
+- **Rule file opts out** (`<!-- evaluator: skip -->` on the first non-blank line): file is not loaded into the concatenated rules block. If all rule files opt out, Track 2 passes trivially.
+- **Non-English content in diff/rules**: rule files and diff contents stay verbatim; the skill frame (outcome JSON keys, step names) stays English. The `reason` field mirrors the rule file's language for rule-violation cases.
 
 ## Boundaries
 

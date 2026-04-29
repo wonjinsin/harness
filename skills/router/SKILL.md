@@ -1,6 +1,6 @@
 ---
 name: router
-description: Trigger at the start of every user turn to classify the request into casual / clarify / plan, detect natural-language resume intent, and allocate a session slug. All downstream skills assume router has run first. Deterministic keyword detection first, LLM judgment as fallback.
+description: Use at the start of a user turn before any planning skill runs — bootstraps a `.planning/` session (slug + scaffold) or matches the request against an existing session for resume.
 ---
 
 # Router
@@ -15,7 +15,7 @@ Every user request enters the harness through this skill. The router answers thr
 
 The router never writes code and never executes tasks. It only decides **where the request goes next**.
 
-All internal reasoning, keyword matching, and user-facing prompts produced by this skill are in English, regardless of the language the user writes in. The LLM still understands non-English input and classifies it correctly — but the skill does not maintain per-language rule tables, and it asks its own clarifying questions (e.g. slug confirmation) in English. Keeping the skill monolingual means one set of rules to maintain and one surface to debug.
+Internal rules and prompts stay English-only; the LLM understands non-English user input fine.
 
 ## Why three routes
 
@@ -46,7 +46,7 @@ If both signals are present:
 
 ### Step 2 — casual / clarify / plan classification
 
-Apply the heuristics in "Classification signals" and "False-positive traps" below. The keyword catalogue at the end lists narrow regex hints that match unambiguous cases; everything else relies on reading the definitions and applying judgment.
+Apply the heuristics in "Classification signals" and "False-positive traps" below. `references/keywords.md` lists narrow regex hints that match unambiguous cases; everything else relies on reading the definitions and applying judgment.
 
 When ambiguous between **plan** and **clarify**, choose **clarify**.
 
@@ -72,27 +72,18 @@ Create the session directory with skeletons:
 
 Leave the files empty of task content. Downstream skills (`prd-writer`, `trd-writer`, `task-writer`) fill them in.
 
-### Step 5 — Hand off
+### Step 5 — Emit
 
-Emit a structured classification; `harness-flow.yaml` consumes it via the `outcome` field.
+Build a single JSON object with `outcome`, `session_id`, and `next` (resolved from the routing table below). `harness-flow.yaml` consumes it via the `outcome` field. **Skip JSON entirely for `casual`** — reply to the user in plain text and end.
 
-| Outcome | Next node (per harness-flow.yaml) | Payload |
-|---------|---------------------------|---------|
-| `casual` | END — router replies inline | — |
+| Outcome | Next | Payload |
+|---------|------|---------|
+| `casual` | — (no JSON, inline reply) | — |
 | `clarify` | `brainstorming` (runs full Q&A) | `{ request, session_id, route: "clarify" }` |
 | `plan` | `brainstorming` (skips Q&A, classifies directly) | `{ request, session_id, route: "plan" }` |
 | `resume` | `brainstorming` (Step 0 short-circuits to next incomplete phase) | `{ request, session_id, route: "resume", resume: true }` |
 
 `resume` is its own outcome — not a boolean flag on `plan`. When Step 1 matches an existing session, emit `outcome: "resume"`; otherwise `plan`.
-
-### Step 6 — Resolve `next`
-
-Before emitting the final JSON, perform the next-node lookup per `using-harness § Core loop` steps 3–5 against your own outgoing edges in `harness-flow.yaml`. The resolution is straightforward — the table above maps each outcome to its `next`:
-
-- `casual` → no downstream edge matches → `next: null`
-- `clarify` / `plan` / `resume` → `next: "brainstorming"`
-
-Include `next` as a field in the emitted JSON. Skip this step on `casual` (no JSON is emitted at all).
 
 ## Classification signals
 
@@ -170,17 +161,9 @@ Principle: the signal is **action intent directed at this turn**, not mention of
 
 ## Anaphoric resume signals
 
-A resume verb (`resume`, `continue`, `pick up where`, `keep going on`, `go back to`) requires a **reference to prior work** to count as a resume cue. Prior-work references take these forms:
+A resume verb (`resume`, `continue`, `pick up where`, `keep going on`, `go back to`) needs a prior-work reference — an explicit slug, named feature, or temporal/demonstrative/process anaphor pointing at past work. Examples: "continue the 2FA work from yesterday", "pick up where we left off on that auth bug".
 
-1. **Explicit slug** — the user names an existing session id or a close variant.
-2. **Named feature** — "the 2FA work", "the auth migration", "the profile page" — a noun phrase that matches a past session's goal or title.
-3. **Temporal anaphor** — "yesterday's …", "this morning's …", "last session's …", "the one we started Monday".
-4. **Demonstrative anaphor** — "that bug", "that feature", "that thing we were doing", "the one where login broke".
-5. **Process anaphor** — "where we left off", "what I was working on", "the paused phase".
-
-When any of these co-occurs with a resume verb, treat it as a resume cue and run the `.planning/` match.
-
-Bare resume verbs with **no** anaphor default to current-turn continuation. Example: after the assistant says "I'll refactor this now", the user's "continue" means "go ahead with that", not "reopen a prior session".
+Bare resume verbs with no anaphor default to current-turn continuation (e.g. user says "continue" right after assistant proposes an action).
 
 ## Input
 
@@ -204,7 +187,7 @@ Schema:
 
 - `outcome`: `"clarify"`, `"plan"`, or `"resume"` — main thread looks this up in `harness-flow.yaml` transitions
 - `session_id`: `"YYYY-MM-DD-slug"`
-- `next`: resolved downstream node id from Step 6 — always `"brainstorming"` for these outcomes
+- `next`: resolved downstream node id from Step 5 — always `"brainstorming"` for these outcomes
 
 ### Examples
 
@@ -228,28 +211,9 @@ Input: `let's continue the 2FA work from yesterday` (match found in `.planning/2
 {"outcome":"resume","session_id":"2026-04-18-add-2fa-login","next":"brainstorming"}
 ```
 
-## Keyword catalogue (reference)
+## Keyword catalogue
 
-The patterns below are hints — they mark unambiguous cases for fast classification. Anything they miss (and anything that appears in a false-positive-trap context) falls to the heuristics above. Patterns are English-only by design; non-English inputs rely on the LLM layer applying the same definitions.
-
-**Resume verb** (must co-occur with anaphor per "Anaphoric resume signals"):
-
-- `\b(resume|continue|pick\s+up\s+where|keep\s+going\s+on|go\s+back\s+to)\b`
-
-**casual:**
-
-- `^(hi|hello|hey|yo|sup)\b`
-- `\b(what\s+can\s+you\s+(do|build)|how\s+does\s+this\s+work|who\s+are\s+you)\b`
-
-**plan (verbs):**
-
-- `\b(add|fix|implement|refactor|migrate|build|create|remove|replace)\b`
-
-**clarify (vague):**
-
-- `\b(make\s+it\s+(better|good|nice)|clean\s+it\s+up|improve\s+the\s+code)\b`
-
-Keep these in sync with `harness-flow.yaml`.
+See `references/keywords.md` for the deterministic keyword catalogue used by Step 2.
 
 ## Boundaries
 

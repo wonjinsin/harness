@@ -1,11 +1,17 @@
 ---
 name: doc-updater
-description: Use after `evaluator` passes. Reflect the session's code changes into `CHANGELOG.md` (unconditional), `README.md`, `CLAUDE.md`, `docs/**/*.md`. Writes `.planning/{session_id}/findings.md` as audit log. No user confirmation — evaluator already gated, doc edits are git-revertable.
+description: Use after the harness evaluator node passes and a session's code changes need to be reflected into project docs (CHANGELOG.md, README.md, CLAUDE.md, docs/**/*.md). Use when running as the doc-updater terminal node in harness-flow.yaml.
 ---
 
 # Doc Updater
 
 Reflect session code changes into project docs. Runs in the `doc-updater` agent's isolated context.
+
+## When NOT to use
+
+- Outside the harness flow (call `evaluator` first; doc-updater assumes its gate has passed).
+- When the user wants README translation or version bumps — those belong to a human.
+- When the diff is empty: that means upstream produced no changes worth documenting; emit `error`, not `done`.
 
 ## Input
 
@@ -29,7 +35,7 @@ Single JSON object, no prose alongside. `next` is always `null` — `doc-updater
 
 2. **CHANGELOG.md (unconditional)** — create with [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) skeleton if absent. Find `## [Unreleased]` (insert if missing). Classify each task into `Added` / `Changed` / `Fixed` / `Security` / `Deprecated` / `Removed`. Security-relevant diffs (auth, crypto, input validation, secrets, RBAC) double-emit under `Security`. Ambiguous → prefer `Added > Changed > Fixed`. One bullet per task: `- {imperative one-liner} (TASKS.md: task-{id})`.
 
-3. **README.md / CLAUDE.md / docs/\*\*/\*.md** — for each file that exists, identify sections semantically touched by the diff. Apply a small edit (≤20 lines): update existing section (with line number) or append new `## {heading}` at file end. If the diff demands a top-to-bottom rewrite, record as `not applied — structural rewrite required` and skip.
+3. **README.md / CLAUDE.md / docs/\*\*/\*.md** — for each file that exists, identify sections semantically touched by the diff. Apply a small edit (≤20 lines): update existing section (with line number) or append new `## {heading}` at file end. If the diff demands a top-to-bottom rewrite, record as `not applied — structural rewrite required` and skip (≤20 lines keeps each doc edit reviewable as a single hunk; structural rewrites belong to a human, not silent chunking).
 
 4. **findings.md** — write `.planning/{session_id}/findings.md`:
 
@@ -54,7 +60,7 @@ Single JSON object, no prose alongside. `next` is always `null` — `doc-updater
 
    Omit `## Not applied` if empty.
 
-5. **Emit** `{outcome, session_id, next: null}`. The lookup per `using-harness § Core loop` finds no candidate (no node in `harness-flow.yaml` has `doc-updater` in its `depends_on`), so `next` is always `null`.
+5. **Emit** `{outcome, session_id, next: null}`. doc-updater is a terminal node — `next` is always `null`.
 
 ## Constraints
 
@@ -63,6 +69,12 @@ Single JSON object, no prose alongside. `next` is always `null` — `doc-updater
 - No translation (e.g., `README.ko.md`), version bumps, or new doc files beyond the four targets — record skipped variants under `## Not applied`.
 - No user questions. Ambiguity → record in `## Not applied` and continue.
 - `not applied` never escalates to `error` — only unrecoverable infra failures do (permission denied, disk full, corrupted CHANGELOG).
+
+## Common Mistakes
+
+- **Translating README** — out of scope. README.ko.md or other locale variants belong to a human translator; record under `## Not applied` and continue.
+- **Version bumping** — out of scope. Version semantics are a release decision, not a doc-impact decision.
+- **Escalating `not applied` to `error`** — `not applied` is a normal outcome (recorded in findings.md). Only unrecoverable infra failures (permission denied, disk full, corrupted CHANGELOG) become `error`.
 
 ## Tools
 

@@ -1,13 +1,11 @@
 ---
 name: using-harness
-description: Harness bootstrap — you interpret the harness DAG file and dispatch the next node after every skill completes. The DAG file is the single source of truth; this skill teaches you how to read it. Loaded at session start via hook, not invoked manually.
+description: Use when any harness skill finishes, when a user message may start a flow, or at session start — explains how to read harness-flow.yaml and dispatch the next node.
 ---
 
 # Using Harness
 
-**Harness DAG file**: `${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml`. The SessionStart hook injects the resolved path into context — use whichever absolute path the hook surfaced. **You = interpreter.** No runtime engine. Read the YAML, dispatch the next node yourself.
-
-> The plugin root is wherever Claude Code mounted this plugin (e.g. `~/.claude/plugins/marketplaces/<mp>/plugins/harness-flow/`). Never read `docs/harness/harness-flow.yaml` as a relative path — the user's project CWD won't have it.
+**Harness DAG file**: `${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml` (plugin root, **not** user CWD — the SessionStart hook injects the resolved absolute path; never read it as a relative path). **You = interpreter.** No runtime engine: read the YAML, dispatch the next node yourself. Session artifacts live under `.planning/{session_id}/` (relative — written into the user's project).
 
 ## Core loop
 
@@ -23,31 +21,7 @@ After any skill completes (or a user message arrives):
 
 ## Downstream self-lookup (the `next` field)
 
-Every harness skill performs steps 1–5 of the Core loop **for its own outgoing edges** before emitting its final JSON, and includes the resolved next-node id as `next`:
-
-- One matching candidate → `"next": "<node-id>"`.
-- No matching candidate → `"next": null` (this skill is a terminal in the current branch).
-- Multiple matching candidates → emit the first one listed in `harness-flow.yaml` (same tiebreak as the Core loop).
-
-Why every skill does this even though main thread re-derives independently:
-
-- **Self-validation.** A skill that cannot find any matching downstream edge for its own outcome is emitting a value the flow doesn't expect — that is almost always a bug in the skill, and surfacing it as `"next": null` makes it visible.
-- **Single source of truth.** Hard-coded "next-skill" hints in SKILL.md drift from `harness-flow.yaml` over time. Re-evaluating the YAML each run keeps the two in sync.
-- **Cross-check with main thread.** Main thread re-derives `next` independently. Mismatch = bug (in the skill, in the flow file, or in how the payload was threaded). Log and prefer the main-thread result.
-
-Subagents (`context: fresh` skills) cannot directly invoke the next node — they emit `next` as a hint. Main thread is still the dispatcher.
-
-### Threading upstream outcomes through payloads
-
-A downstream `when:` expression may reference an upstream node's output (e.g., `task-writer`'s `when:` reads `$brainstorming.output.outcome`). For a dispatched skill to evaluate its own outgoing edges, it needs those upstream values in its payload.
-
-Convention: when dispatching a node, include in the payload every upstream `outcome` referenced by that node's downstream edges in `harness-flow.yaml`. Today this means:
-
-- `prd-writer` payload includes `brainstorming_outcome` (its downstream `trd-writer` / `task-writer` `when:` both reference `$brainstorming.output.outcome`).
-- `trd-writer` payload includes `brainstorming_outcome` (its downstream `task-writer` `when:` references it).
-- All other skills' downstream edges either have no `when:` or reference only the immediate upstream's outcome (which the skill already has as its own `outcome`), so no extra payload field is needed.
-
-If you add a new edge whose `when:` references an upstream outcome the dispatched skill doesn't currently receive, update both the flow file and the payload schema in the skill's SKILL.md.
+Every harness skill emits a `next` field resolved by running steps 1–5 of the Core loop on its own outgoing edges. See `references/design-rationale.md` for why every skill performs the lookup itself. See `references/payload-threading.md` for which payload fields each node must thread.
 
 ## Starting the flow
 
@@ -62,27 +36,11 @@ At flow start, generate `session_id = "YYYY-MM-DD-{slug}"` where slug is a 2-4 w
 
 Every harness skill emits a single JSON object as its final message:
 
-- Success: `{"outcome": "<value>", "session_id": "<id>", "next": "<next-node-id>" | null, ...}`
-- Error: `{"outcome": "error", "session_id": "<id>", "reason": "<one line>", "next": null}`
+```json
+{"outcome": "<value>", "session_id": "<id>", "next": "<node-id>" | null, ...}
+```
 
-`next` is the skill's own resolved downstream lookup (see "Downstream self-lookup"). Use the `outcome` (not `next`) to re-derive your own dispatch decision; treat the skill's `next` as a cross-check signal — log if it disagrees with your derivation. Never invent output fields beyond these — read what the skill actually emitted.
-
-## Context isolation
-
-Nodes marked `context: fresh` should run in an isolated subagent when possible:
-
-- If `Task` / `Agent` tool is available → dispatch via subagent (clean context, heavy skill doesn't pollute main thread).
-- Otherwise → run inline, knowing context bleed is a cost.
-
-## Session artifacts
-
-All session state lives under `.planning/{session_id}/`:
-
-- `STATE.md` — main-thread progress ledger
-- `PRD.md` / `TRD.md` / `TASKS.md` — writer outputs
-- `findings.md` — doc-updater audit log
-
-Skills own their own artifacts; `STATE.md` is main-thread responsibility.
+On error: `outcome: "error"`, add `reason: "<one line>"`, `next: null`. Re-derive your dispatch from `outcome`; treat the skill's `next` as a cross-check signal — log if it disagrees.
 
 ## Rules
 
@@ -90,9 +48,4 @@ Skills own their own artifacts; `STATE.md` is main-thread responsibility.
 - **Multiple candidates match** → pick the first listed in `harness-flow.yaml`.
 - **Missing `outcome` field** in a skill's output → treat as flow termination, report to user.
 - **Don't recurse endlessly** — if you've invoked the same node twice in a session without making progress, stop and ask the user.
-
-## Files
-
-- Flow: `${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml` (plugin root, **not** user CWD)
-- Skills: registered by name on plugin load — `Skill("<command>")`. Fallback: `${CLAUDE_PLUGIN_ROOT}/skills/<command>/SKILL.md` via `Read`.
-- Artifacts: `.planning/{session_id}/` (relative — written into the **user's project**, not the plugin)
+- **`context: fresh` nodes** → run via subagent (`Task` / `Agent`) when available; subagents emit `next` as a hint only — main thread stays the dispatcher.
