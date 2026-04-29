@@ -4,7 +4,7 @@ The complete Q&A protocol referenced from `SKILL.md`. Step 0 → Phase A (A1–A
 
 ## Step 0 — Resume short-circuit
 
-If `resume: true`, read `.planning/{session_id}/ROADMAP.md`. If it contains a `Complexity: X` line (X ∈ prd-trd / prd-only / trd-only / tasks-only) **and** the `brainstorming` phase is `[x]`, do **not** re-intake. Emit a route payload that points downstream to the next incomplete phase per `harness-flow.yaml` and end. Rationale: re-asking the user "which route?" when they already decided it last session wastes a turn and erodes trust.
+If `resume: true`, read `.planning/{session_id}/ROADMAP.md`. If it contains a `Complexity: X` line (X ∈ prd-trd / prd-only / trd-only / tasks-only) **and** the `brainstorming` phase is `[x]`, do **not** re-intake. Emit a route payload that points downstream to the next incomplete phase (the main thread follows the "Required next skill" markers from there) and end. Rationale: re-asking the user "which route?" when they already decided it last session wastes a turn and erodes trust.
 
 If `resume: true` but classification is missing (e.g., session was interrupted mid-Gate-1), proceed normally — skip Phase A (router only picks `resume` when prior signal is sufficient) and start Phase B.
 
@@ -161,11 +161,6 @@ On acceptance (including override):
    - Add / update the line `Complexity: {route} ({expansion})` near the top.
    - Mark `- [ ] brainstorming` → `- [x] brainstorming    → {route} (approved)`. If `user_overrode`, use `→ {route} (overridden from {recommended-route})` instead. The user_overrode bit lives on this single row — there is no separate `gate-1-approval` checkbox (Gate 1 is absorbed into brainstorming, so a second row would be redundant).
 2. **Update `STATE.md`**:
-   - `Current Position: {next phase per harness-flow.yaml}`
+   - `Current Position: {next phase — the route name implies the writer}`
    - `Last activity: {ISO timestamp} — classified as {route}{, user-overrode if applicable}`
-3. **Resolve `next`** — perform the next-node lookup per `using-harness § Core loop` steps 3–5 against this skill's outgoing edges. The resolution table is fixed by the route → first-listed-candidate rule:
-   - `prd-trd` / `prd-only` → `prd-writer`
-   - `trd-only` → `trd-writer`
-   - `tasks-only` → `task-writer`
-   - `pivot` / `exit-casual` → `null` (no edge matches)
-4. **Emit the route payload** as the final message — `outcome` is the route name (`prd-trd`/`prd-only`/`trd-only`/`tasks-only`) and `next` is the resolved downstream node id. Main thread evaluates `when:` expressions in `harness-flow.yaml` and dispatches the correct writer agents (cross-checking against `next`).
+3. **Emit the route payload** as the final message — `outcome` is the route name (`prd-trd` / `prd-only` / `trd-only` / `tasks-only` / `pivot` / `exit-casual`). The main thread reads SKILL.md's "Required next skill" section to dispatch the correct writer.

@@ -1,11 +1,15 @@
 ---
 name: doc-updater
-description: harness `evaluator` 노드가 통과한 뒤 세션의 코드 변경을 프로젝트 문서(`CHANGELOG.md`, `README.md`, `CLAUDE.md`, `docs/**/*.md`)에 반영해야 할 때 사용. `harness-flow.yaml`의 doc-updater 종단 노드로 실행될 때 사용.
+description: harness `evaluator` 노드가 통과한 뒤 세션의 코드 변경을 프로젝트 문서(`CHANGELOG.md`, `README.md`, `CLAUDE.md`, `docs/**/*.md`)에 반영해야 할 때 사용. harness 흐름의 doc-updater 종단 노드로 실행될 때 사용.
 ---
 
 # Doc Updater
 
 세션의 코드 변경을 프로젝트 문서에 반영. `doc-updater` agent 의 격리 컨텍스트에서 실행.
+
+## 실행 모드
+
+**Subagent (격리 컨텍스트).** 메인 thread 가 Skill 툴로 SKILL.md 를 로드한 뒤 Task 툴로 별도 dispatch. 서브에이전트는 payload 외 메인 대화 히스토리에 접근 불가.
 
 ## When NOT to use
 
@@ -22,11 +26,11 @@ description: harness `evaluator` 노드가 통과한 뒤 세션의 코드 변경
 
 ## Output
 
-단일 JSON 객체, 옆에 산문 금지. `next` 는 항상 `null` — `doc-updater` 는 terminal node (`harness-flow.yaml` 에 downstream edge 없음):
+단일 JSON 객체, 옆에 산문 금지.
 
 ```json
-{ "outcome": "done", "session_id": "...", "next": null }
-{ "outcome": "error", "session_id": "...", "reason": "<one line>", "next": null }
+{ "outcome": "done", "session_id": "..." }
+{ "outcome": "error", "session_id": "...", "reason": "<one line>" }
 ```
 
 ## Procedure
@@ -60,7 +64,11 @@ description: harness `evaluator` 노드가 통과한 뒤 세션의 코드 변경
 
    `## Not applied` 비어있으면 생략.
 
-5. **방출** `{outcome, session_id, next: null}`. doc-updater 는 terminal 노드 — `next` 는 항상 `null`.
+5. **방출** — doc-updater 는 terminal node — `{outcome, session_id}` (에러 시 `{outcome, session_id, reason}`) 방출.
+
+## 필수 다음 스킬
+
+doc-updater 는 terminal node — harness 흐름이 여기서 종료. 사용자에게 짧은 요약 (CHANGELOG 항목, 갱신된 파일) 을 보고하고 멈춤.
 
 ## Constraints
 

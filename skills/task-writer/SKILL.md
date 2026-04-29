@@ -13,6 +13,10 @@ See `references/contract.md` for the payload schema, output JSON, error taxonomy
 
 This skill receives `session_id`, `request` (always present), optional `prd_path`, optional `trd_path`, and optional `brainstorming_output`. If `prd_path`, `trd_path`, **and** `brainstorming_output` are all null and `request` has no actionable verb, emit `error`.
 
+## Execution mode
+
+**Subagent (격리 컨텍스트).** 메인 thread 가 Skill 툴로 SKILL.md 를 로드한 뒤 Task 툴로 별도 dispatch. 서브에이전트는 payload 외 메인 대화 히스토리에 접근 불가.
+
 ## Why this exists
 
 Per-task subagents do not have PRD/TRD in context — they only see the task text from TASKS.md. Preserving PRD/TRD vocabulary verbatim is therefore correctness, not style: the evaluator greps for PRD acceptance terms, and rephrasing breaks the trace.
@@ -82,9 +86,18 @@ Create `.planning/{session_id}/` if missing. Write `TASKS.md`. If the file alrea
 
 Before writing Self-Review, actually perform each check and only `[x]` boxes you can honestly certify. Unchecked signals a known gap for the evaluator; checking falsely is worse than missing a task.
 
-### Step 6 — Resolve `next` and emit
+### Step 6 — Emit
 
-Per `using-harness § Core loop` steps 3–5: sole candidate is `executor` (no `when:`). `done` → `executor`, `error` → `null`. Emit the final JSON.
+Emit the final JSON. That is your entire final message.
+
+## Required next skill
+
+When this skill emits `outcome: "done"`:
+
+- **REQUIRED SUB-SKILL:** Use harness-flow:parallel-task-executor
+  Payload: `{ session_id }` — the executor reads `.planning/{session_id}/TASKS.md` directly.
+
+On `outcome: "error"`: flow terminates. Report to the user and stop.
 
 ## Edge cases
 
@@ -97,6 +110,6 @@ Per `using-harness § Core loop` steps 3–5: sole candidate is `executor` (no `
 ## Boundaries
 
 - Writes only to `.planning/{session_id}/TASKS.md`. Do not touch PRD.md, TRD.md, ROADMAP.md, STATE.md — PRD/TRD are upstream read-only.
-- Do not invoke other agents or skills. Do not dispatch the executor — the main thread follows harness-flow.yaml.
+- Do not invoke other agents or skills. Do not dispatch the executor — the 'Required next skill' section above dispatches downstream.
 - Do not modify source code, even if you spot bugs. Note them in Notes if load-bearing.
 - Tool budget: ~20 Read/Grep/Glob calls. If you need more, halt and emit `error` with a `reason`.

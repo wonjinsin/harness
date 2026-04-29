@@ -19,4 +19,4 @@ The patterns below are hints — they mark unambiguous cases for fast classifica
 
 - `\b(make\s+it\s+(better|good|nice)|clean\s+it\s+up|improve\s+the\s+code)\b`
 
-Keep these in sync with `harness-flow.yaml`.
+Keep these in sync with the route names in `skills/router/SKILL.md`.

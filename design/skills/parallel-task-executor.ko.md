@@ -36,6 +36,10 @@ digraph when {
 - `.planning/{session_id}/TASKS.md` 와 `ROADMAP.md` 읽음.
 - 단일 JSON 한 개 emit: `done | blocked | failed | error`. `references/output-schemas.md` 참조.
 
+## 실행 모드
+
+**Main context.** 메인 thread 가 직접 실행. 자체가 task 들을 Task 툴로 병렬 dispatch 하는 오케스트레이터이므로 격리 컨텍스트가 아닌 메인에서 돌아야 함.
+
 ## Procedure (요약)
 
 1. TASKS.md 로드·검증 (환경, 모양, resume) → `references/procedure.md#step-1--tasksmd-로드검증`
@@ -44,7 +48,7 @@ digraph when {
 4. `references/subagent-prompt.md` 로 프롬프트 구성; dispatch 시점에 `{executor-skill-path}` 치환.
 5. 각 리턴을 DONE / BLOCKED / FAILED / skipped 로 분류 → `references/procedure.md#step-5--각-subagent-리턴-분류`
 6. task 별 `[Result]` 블록 기록 → `references/result-block-format.md`
-7. ROADMAP.md 최종화, `next` 해석, JSON emit → `references/procedure.md#step-7--roadmapmd-최종화next-해석emit`
+7. ROADMAP.md 최종화, JSON emit → `references/procedure.md#step-7--roadmapmd-최종화next-해석emit`
 
 ## Why this shape
 
@@ -52,6 +56,15 @@ digraph when {
 - **세 실패 클래스 (blocked / failed / error) 는 잘못된 task 에 대한 retry 루프를 막는다.** BLOCKED = task 본문이 틀림, 재시도 무효. FAILED = 시도가 틀림, cap 까지 재시도.
 - **3회 task-local cap 이 유일한 retry.** 세션 레벨 루프 없음. cap 은 TASKS.md `[Result]` 블록을 통해 세션 전체에 걸쳐 — 대화 재시작이 무한 늘리지 못함.
 - **Subagent 는 self-contained.** PRD/TRD 나 다른 task 를 읽지 않는다 — task-writer 의 "verbatim, 플레이스홀더 금지" 규칙이 task 본문만으로 충분하게 만든다.
+
+## 필수 다음 스킬
+
+이 스킬이 `outcome: "done"` 을 emit 할 때:
+
+- **필수 하위 스킬:** harness-flow:evaluator 사용
+  Payload: `{ session_id, tasks_path: ".planning/{session_id}/TASKS.md", rules_dir, diff_command }`
+
+`outcome: "blocked"` / `"failed"` / `"error"` 일 때: flow 종료. 실패 디테일을 사용자에게 보고하고 멈춘다. (non-done outcome 에서는 evaluator 가 돌지 않는다 — blocker 해소는 사람의 결정.)
 
 ## Anti-patterns
 
@@ -66,6 +79,6 @@ digraph when {
 
 - `references/procedure.md` — Step 1-7 전체 디테일.
 - `references/subagent-prompt.md` — subagent 별 프롬프트 템플릿.
-- `references/output-schemas.md` — JSON 변형 + `error → evaluator` cascade.
+- `references/output-schemas.md` — JSON 변형.
 - `references/result-block-format.md` — `[Result]` 블록 + status delta.
 - `references/test-driven-development.md` — task 별 적용되는 TDD 규율 (영문 reference 사용; 별도 `.ko` 미러 없음).

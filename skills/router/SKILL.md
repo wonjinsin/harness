@@ -17,6 +17,10 @@ The router never writes code and never executes tasks. It only decides **where t
 
 Internal rules and prompts stay English-only; the LLM understands non-English user input fine.
 
+## Execution mode
+
+**Main context.** 메인 thread 가 직접 실행. 격리 서브에이전트가 아님 — `.planning/` 스캐폴드 작성과 세션 슬러그 발급이 메인 컨텍스트에서 일어남.
+
 ## Why three routes
 
 - **casual** exists so small talk and meta-questions don't drag through session allocation, planning, and downstream skills. A user saying "hi" or "what can you do" shouldn't create a `.planning/` directory.
@@ -27,7 +31,7 @@ When in doubt between **plan** and **clarify**, prefer **clarify** — one extra
 
 ## When to use
 
-Trigger this skill as the very first step of every user turn. Skip only when another skill has already handed control off explicitly via `harness-flow.yaml`.
+Trigger this skill as the very first step of every user turn. Skip only when another harness skill is mid-flow and has named a different next skill.
 
 ## Procedure
 
@@ -40,7 +44,7 @@ If both signals are present:
 1. Read `.planning/`. If the directory doesn't exist, there are no sessions — fall through to fresh-session flow.
 2. For each subdirectory, read `ROADMAP.md`. Keep only sessions with at least one `- [ ]` unchecked item.
 3. Match the request against candidates using slug similarity plus overlap with the session's goal/title.
-4. **One match** → load that session. Emit `outcome: "resume"` with `session_id` set. Classifier's Step 0 short-circuits and jumps to the next incomplete phase per `harness-flow.yaml`.
+4. **One match** → load that session. Emit `outcome: "resume"` with `session_id` set. Brainstorming's Step 0 short-circuits and jumps to the next incomplete phase.
 5. **Multiple matches** → ask the user to pick. Format: `{slug} — {one-line goal}`.
 6. **No match, or user rejects the proposed match** → fall through to fresh-session flow.
 
@@ -74,14 +78,14 @@ Leave the files empty of task content. Downstream skills (`prd-writer`, `trd-wri
 
 ### Step 5 — Emit
 
-Build a single JSON object with `outcome`, `session_id`, and `next` (resolved from the routing table below). `harness-flow.yaml` consumes it via the `outcome` field. **Skip JSON entirely for `casual`** — reply to the user in plain text and end.
+Build a single JSON object with `outcome` and `session_id`. **Skip JSON entirely for `casual`** — reply to the user in plain text and end.
 
-| Outcome | Next | Payload |
-|---------|------|---------|
-| `casual` | — (no JSON, inline reply) | — |
-| `clarify` | `brainstorming` (runs full Q&A) | `{ request, session_id, route: "clarify" }` |
-| `plan` | `brainstorming` (skips Q&A, classifies directly) | `{ request, session_id, route: "plan" }` |
-| `resume` | `brainstorming` (Step 0 short-circuits to next incomplete phase) | `{ request, session_id, route: "resume", resume: true }` |
+| Outcome | Payload |
+|---------|---------|
+| `casual` | — (no JSON, inline reply) |
+| `clarify` | `{ request, session_id, route: "clarify" }` |
+| `plan` | `{ request, session_id, route: "plan" }` |
+| `resume` | `{ request, session_id, route: "resume", resume: true }` |
 
 `resume` is its own outcome — not a boolean flag on `plan`. When Step 1 matches an existing session, emit `outcome: "resume"`; otherwise `plan`.
 
@@ -185,9 +189,8 @@ Two emission modes depending on `outcome`:
 
 Schema:
 
-- `outcome`: `"clarify"`, `"plan"`, or `"resume"` — main thread looks this up in `harness-flow.yaml` transitions
+- `outcome`: `"clarify"`, `"plan"`, or `"resume"`
 - `session_id`: `"YYYY-MM-DD-slug"`
-- `next`: resolved downstream node id from Step 5 — always `"brainstorming"` for these outcomes
 
 ### Examples
 
@@ -196,20 +199,28 @@ Input: `hi claude, what can you build?` — casual: router replies with plain te
 Input: `add 2FA to login`
 
 ```json
-{"outcome":"plan","session_id":"2026-04-19-add-2fa-login","next":"brainstorming"}
+{"outcome":"plan","session_id":"2026-04-19-add-2fa-login"}
 ```
 
 Input: `make the auth code better`
 
 ```json
-{"outcome":"clarify","session_id":"2026-04-19-improve-auth","next":"brainstorming"}
+{"outcome":"clarify","session_id":"2026-04-19-improve-auth"}
 ```
 
 Input: `let's continue the 2FA work from yesterday` (match found in `.planning/2026-04-18-add-2fa-login/`)
 
 ```json
-{"outcome":"resume","session_id":"2026-04-18-add-2fa-login","next":"brainstorming"}
+{"outcome":"resume","session_id":"2026-04-18-add-2fa-login"}
 ```
+
+## Required next skill
+
+The next skill depends on `outcome`:
+
+- `outcome == "clarify"` or `"plan"` or `"resume"` → **REQUIRED SUB-SKILL:** Use harness-flow:brainstorming
+  Payload: `{ session_id, request, route: <outcome>, resume?: true }`
+- `outcome == "casual"` → no JSON emitted; flow does not engage. Reply directly to the user and stop.
 
 ## Keyword catalogue
 

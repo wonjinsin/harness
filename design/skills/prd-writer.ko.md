@@ -13,6 +13,10 @@ payload schema, output JSON, error taxonomy, 공통 anti-pattern 은 `references
 
 이 스킬은 `session_id`, `request`, `brainstorming_outcome` (`"prd-trd"` 또는 `"prd-only"` — 필수), 그리고 선택 `brainstorming_output` 을 받는다. `brainstorming_output` 이 null 이면 `request` 의 첫 동사로 intent 복원 (첫 동사 규칙, 기본 `add`).
 
+## 실행 모드
+
+**Subagent (격리 컨텍스트).** 메인 thread 가 Skill 툴로 SKILL.md 를 로드한 뒤 Task 툴로 별도 dispatch. 서브에이전트는 payload 외 메인 대화 히스토리에 접근 불가.
+
 ## 절차
 
 ### Step 1 — Payload 읽기
@@ -54,13 +58,21 @@ PRD 한정 anti-pattern (`references/contract.md` 의 공통 항목에 추가): 
 
 JSON 객체 하나를 최종 메시지로 emit. 필수 필드:
 
-- `node_id: "prd-writer"` — Stop 훅 디스패처가 어떤 노드가 emit 했는지 식별하는 데 사용.
 - `outcome: "done" | "error"`.
 - `session_id`.
-- `brainstorming_outcome` — payload 에서 받은 값을 그대로 echo (디스패처가 다운스트림 `when:` 평가에 사용).
+- `brainstorming_outcome` — payload 에서 받은 값을 그대로 echo (메인 스레드가 이 값을 보고 다음 스킬을 결정).
 - `path: ".planning/{session_id}/PRD.md"` — `done` 일 때.
 - `reason: "<짧게>"` — `error` 일 때.
-- `next` — best-effort cross-check: `brainstorming_outcome == "prd-trd"` → `trd-writer`, `"prd-only"` → `task-writer`, 그 외 → `null`. Stop 훅이 재계산하며 mismatch 는 로그.
+
+## 필수 다음 스킬
+
+다음 스킬은 이 스킬 출력에 echo 된 `brainstorming_outcome` 에 따라 갈린다:
+
+- `brainstorming_outcome == "prd-trd"` → **필수 하위 스킬:** harness-flow:trd-writer 사용
+  Payload: `{ session_id, request, prd_path, brainstorming_outcome: "prd-trd", brainstorming_output }`
+- `brainstorming_outcome == "prd-only"` → **필수 하위 스킬:** harness-flow:task-writer 사용
+  Payload: `{ session_id, request, prd_path, brainstorming_output }`
+- `outcome: "error"` 인 경우 → 흐름 종료. 사용자에게 보고하고 멈춘다.
 
 ## 엣지 케이스
 
@@ -72,6 +84,6 @@ JSON 객체 하나를 최종 메시지로 emit. 필수 필드:
 ## 경계
 
 - `.planning/{session_id}/PRD.md` 만 쓴다. ROADMAP.md, STATE.md 는 건드리지 않는다.
-- 다른 agent/skill 호출 금지. trd-writer·task-writer dispatch 금지 — 메인 스레드가 harness-flow.yaml 따름.
+- 다른 agent/skill 호출 금지. trd-writer·task-writer dispatch 금지 — 위의 '필수 다음 스킬' 섹션이 하류로 디스패치한다.
 - 탐색 중 버그를 발견해도 소스 코드 수정 금지. load-bearing 이면 Open questions 에.
 - 툴 예산: Read/Grep/Glob ~15회. 넘어가면 중단하고 `error` + `reason` 으로 예산 고갈을 기록.

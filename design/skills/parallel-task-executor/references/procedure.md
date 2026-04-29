@@ -4,13 +4,13 @@
 
 ## Step 1 — TASKS.md 로드·검증
 
-`TASKS.md` 전체 읽기. 파일이 없으면 halt: `{"outcome": "error", "session_id": "...", "reason": "TASKS.md not found at .planning/{session_id}/TASKS.md", "next": "evaluator"}` (task-writer 가 산출물을 emit 하지 않은 것).
+`TASKS.md` 전체 읽기. 파일이 없으면 halt: `{"outcome": "error", "session_id": "...", "reason": "TASKS.md not found at .planning/{session_id}/TASKS.md"}` (task-writer 가 산출물을 emit 하지 않은 것).
 
 각 `task-N` 의 `Depends:`, `Files:`, `Acceptance:` 블록 추출. `## Goal` 과 `## Architecture` 도 읽어둔다 — subagent 프롬프트엔 안 들어가지만(너무 넓음) subagent 리턴의 타당성 판단엔 도움.
 
 **환경 검사** (인프라 — 여기 실패는 `error` emit):
 
-- `{executor-skill-path}/references/test-driven-development.md` 존재 확인. 없으면 halt: `{"outcome": "error", "session_id": "...", "reason": "TDD reference file missing at <path>", "next": "evaluator"}`. subagent 가 이 파일 없이는 task 완료 불가.
+- `{executor-skill-path}/references/test-driven-development.md` 존재 확인. 없으면 halt: `{"outcome": "error", "session_id": "...", "reason": "TDD reference file missing at <path>"}`. subagent 가 이 파일 없이는 task 완료 불가.
 
 **TASKS.md 모양 검증** (task-writer 산출물이 틀림 — 여기 실패는 `blocked` emit; task 레벨 reason 은 TASKS.md `[Result]` 블록에 쓰고, 최종 JSON 에는 안 담는다):
 
@@ -69,7 +69,7 @@ task 그래프 위상 정렬. 결과는 **레이어** 시퀀스 — 레이어 N 
 
 - **done**: `status: done` 이고 모든 Acceptance bullet 이 `evidence` 에 검증 방법과 함께 등장. `[Result: done]` + summary 로 마킹.
 - **blocked**: `status: blocked` OR `status: done` 인데 evidence 누락·모호 OR subagent 가 리턴 대신 명확화 질문 OR **`[Result]` 블록 누락/malformed/인식 불가 status 값**. task 명세(또는 subagent 프로토콜 준수)가 틀림 — 재시도 무효. `[Result: blocked, reason: <blockers text 또는 "malformed Result block">]` 마킹, 자동 재 dispatch 안 함.
-- **failed**: `status: failed` OR per-task Task 툴 에러 (subagent 는 시작했으나 깔끔히 완료 못함 — timeout, 컨텍스트 한도 초과, 중간 crash). `[Result: failed, attempt: N, reason: …]` 마킹 후 아래 재시도 정책 적용. **인프라 에러와 구분** — Task 툴 자체가 dispatch 불가(`subagent_type` 무효, 파일시스템 거부, subagent 리턴 대신 프레임워크 레벨 에러 래퍼 반환) 면 전체 런 halt: `{"outcome": "error", "session_id": "...", "reason": "...", "next": "evaluator"}`, 개별 task 마킹 안 함.
+- **failed**: `status: failed` OR per-task Task 툴 에러 (subagent 는 시작했으나 깔끔히 완료 못함 — timeout, 컨텍스트 한도 초과, 중간 crash). `[Result: failed, attempt: N, reason: …]` 마킹 후 아래 재시도 정책 적용. **인프라 에러와 구분** — Task 툴 자체가 dispatch 불가(`subagent_type` 무효, 파일시스템 거부, subagent 리턴 대신 프레임워크 레벨 에러 래퍼 반환) 면 전체 런 halt: `{"outcome": "error", "session_id": "...", "reason": "..."}`, 개별 task 마킹 안 함.
 - **skipped**: 의존 task 가 `blocked` 또는 `failed` 로 종결됐을 때 (리턴 아닌) **할당된다**. Step 3 에서 dispatch 없이 설정. `[Result: skipped, reason: depends on task-N which {blocked|failed}]` 마킹. 재시도 없음, evidence 필드 없음.
 
 **FAILED 재시도 정책** (BLOCKED 아님, skipped 아님):
@@ -100,6 +100,6 @@ task 그래프 위상 정렬. 결과는 **레이어** 시퀀스 — 레이어 N 
 
 `skipped` 는 절대 자체로 top-level outcome 이 되지 않는다 — 항상 루트 원인의 outcome 밑에서 bubble up. task ID 와 reason 은 TASKS.md `[Result]` 블록에 남고, evaluator 가 다시 읽는다.
 
-**`next` 해석**: `using-harness § Core loop` 단계 3–5 에 따라 이 스킬의 outgoing 엣지를 대상으로 next-node 조회. 유일한 후보는 `evaluator` (`depends_on: [executor]`, `when:` 없음). 엣지에 필터가 없으므로 `next` 는 모든 outcome — `error` 포함 — 에 대해 `"evaluator"`. (`error` cascade 는 `output-schemas.md` 참조.)
+메인 thread 가 SKILL.md 의 "Required next skill" 섹션에 따라 `evaluator` 로 dispatch — `done` outcome 에 한해서만. `blocked` / `failed` / `error` 는 흐름 종료.
 
 `STATE.md` 는 **업데이트하지 않는다** — STATE.md 쓰기는 메인 스레드 소유. executor 의 task-local attempt 는 TASKS.md `[Result]` 블록에만 기록.

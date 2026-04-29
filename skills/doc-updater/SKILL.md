@@ -1,11 +1,15 @@
 ---
 name: doc-updater
-description: Use after the harness evaluator node passes and a session's code changes need to be reflected into project docs (CHANGELOG.md, README.md, CLAUDE.md, docs/**/*.md). Use when running as the doc-updater terminal node in harness-flow.yaml.
+description: Use after the harness evaluator node passes and a session's code changes need to be reflected into project docs (CHANGELOG.md, README.md, CLAUDE.md, docs/**/*.md). Use when running as the doc-updater terminal node in the harness flow.
 ---
 
 # Doc Updater
 
 Reflect session code changes into project docs. Runs in the `doc-updater` agent's isolated context.
+
+## Execution mode
+
+**Subagent (격리 컨텍스트).** 메인 thread 가 Skill 툴로 SKILL.md 를 로드한 뒤 Task 툴로 별도 dispatch. 서브에이전트는 payload 외 메인 대화 히스토리에 접근 불가.
 
 ## When NOT to use
 
@@ -22,11 +26,11 @@ Reflect session code changes into project docs. Runs in the `doc-updater` agent'
 
 ## Output
 
-Single JSON object, no prose alongside. `next` is always `null` — `doc-updater` is the terminal node (no downstream edge in `harness-flow.yaml`):
+Single JSON object, no prose alongside.
 
 ```json
-{ "outcome": "done", "session_id": "...", "next": null }
-{ "outcome": "error", "session_id": "...", "reason": "<one line>", "next": null }
+{ "outcome": "done", "session_id": "..." }
+{ "outcome": "error", "session_id": "...", "reason": "<one line>" }
 ```
 
 ## Procedure
@@ -60,7 +64,11 @@ Single JSON object, no prose alongside. `next` is always `null` — `doc-updater
 
    Omit `## Not applied` if empty.
 
-5. **Emit** `{outcome, session_id, next: null}`. doc-updater is a terminal node — `next` is always `null`.
+5. **Emit** — doc-updater is the terminal node — emit `{outcome, session_id}` (or `{outcome, session_id, reason}` on error).
+
+## Required next skill
+
+doc-updater is the terminal node — the harness flow ends here. Report a brief summary to the user (CHANGELOG entries added, files updated) and stop.
 
 ## Constraints
 

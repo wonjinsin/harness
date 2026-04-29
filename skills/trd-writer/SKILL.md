@@ -13,6 +13,10 @@ See `references/contract.md` for the payload schema, output JSON, error taxonomy
 
 This skill receives `session_id`, `request`, optional `prd_path` (set when PRD exists upstream, else `null`), `brainstorming_outcome` (`"prd-trd"` or `"trd-only"` — required), and optional `brainstorming_output`.
 
+## Execution mode
+
+**Subagent (격리 컨텍스트).** 메인 thread 가 Skill 툴로 SKILL.md 를 로드한 뒤 Task 툴로 별도 dispatch. 서브에이전트는 payload 외 메인 대화 히스토리에 접근 불가.
+
 ## Why this exists
 
 TRD answers "what will actually change in code and why this shape?" — distinct from PRD's outcome-framed requirements and TASKS's step-by-step instructions. The only branch is §1 (Context): with PRD it cites the upstream goal; without PRD it states the technical motivation directly. Body shape is identical, so downstream doesn't care which upstream fed the TRD.
@@ -57,11 +61,18 @@ TRD-specific anti-patterns (in addition to `references/contract.md`): no step-by
 
 Create `.planning/{session_id}/` if needed. Write `TRD.md`. If the file already exists, halt and emit `error` per `references/contract.md`.
 
-### Step 5 — Resolve `next` and emit
-
-Per `using-harness § Core loop` steps 3–5: the sole candidate is `task-writer`. On `done`, `next: "task-writer"` (both `prd-trd` and `trd-only` route through here). On `error`, `next: null`.
+### Step 5 — Emit
 
 Emit the final JSON. That is your entire final message.
+
+## Required next skill
+
+When this skill emits `outcome: "done"`:
+
+- **REQUIRED SUB-SKILL:** Use harness-flow:task-writer
+  Payload: `{ session_id, request, prd_path, trd_path, brainstorming_output }`
+
+On `outcome: "error"`: flow terminates. Report to the user and stop.
 
 ## Edge cases
 
@@ -74,6 +85,6 @@ Emit the final JSON. That is your entire final message.
 ## Boundaries
 
 - Writes only to `.planning/{session_id}/TRD.md`. Do not touch PRD.md, ROADMAP.md, or STATE.md — PRD is upstream read-only.
-- Do not invoke other agents or skills. Do not dispatch task-writer — the main thread follows harness-flow.yaml.
+- Do not invoke other agents or skills. Do not dispatch task-writer — the 'Required next skill' section above dispatches downstream.
 - Do not modify source code, even if you spot bugs. Note them in Open questions if load-bearing.
 - Tool budget: ~25 Read/Grep/Glob calls. If you need more, halt and emit `error` with a `reason`.

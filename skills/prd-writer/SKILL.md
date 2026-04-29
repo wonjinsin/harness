@@ -13,6 +13,10 @@ See `references/contract.md` for the payload schema, output JSON, error taxonomy
 
 This skill receives `session_id`, `request`, `brainstorming_outcome` (`"prd-trd"` or `"prd-only"` — required), and optional `brainstorming_output`. If `brainstorming_output` is null, recover intent from the verb in `request` (first-verb rule, default `add`).
 
+## Execution mode
+
+**Subagent (격리 컨텍스트).** 메인 thread 가 Skill 툴로 SKILL.md 를 로드한 뒤 Task 툴로 별도 dispatch. 서브에이전트는 payload 외 메인 대화 히스토리에 접근 불가.
+
 ## Procedure
 
 ### Step 1 — Read the payload
@@ -54,13 +58,21 @@ Create `.planning/{session_id}/` if it doesn't exist. Write `PRD.md`. If the fil
 
 Emit a single JSON object as your entire final message. Required fields:
 
-- `node_id: "prd-writer"` — the Stop hook dispatcher reads this to compute next.
 - `outcome: "done" | "error"`.
 - `session_id`.
-- `brainstorming_outcome` — echo it back from the payload (the dispatcher evaluates downstream `when:` expressions against it).
+- `brainstorming_outcome` — echo it back from the payload (the main thread reads it to pick the next skill).
 - `path: ".planning/{session_id}/PRD.md"` on `done`.
 - `reason: "<short>"` on `error`.
-- `next` — best-effort cross-check: `trd-writer` when `brainstorming_outcome == "prd-trd"`, `task-writer` when `"prd-only"`, else `null`. Stop hook re-derives this; mismatch is logged.
+
+## Required next skill
+
+The next skill depends on `brainstorming_outcome` (echoed in this skill's output):
+
+- `brainstorming_outcome == "prd-trd"` → **REQUIRED SUB-SKILL:** Use harness-flow:trd-writer
+  Payload: `{ session_id, request, prd_path, brainstorming_outcome: "prd-trd", brainstorming_output }`
+- `brainstorming_outcome == "prd-only"` → **REQUIRED SUB-SKILL:** Use harness-flow:task-writer
+  Payload: `{ session_id, request, prd_path, brainstorming_output }`
+- On `outcome: "error"` → flow terminates. Report to the user and stop.
 
 ## Edge cases
 
@@ -72,6 +84,6 @@ Emit a single JSON object as your entire final message. Required fields:
 ## Boundaries
 
 - Writes only to `.planning/{session_id}/PRD.md`. Do not touch ROADMAP.md or STATE.md.
-- Do not invoke other agents or skills. Do not dispatch trd-writer or task-writer — the main thread follows harness-flow.yaml.
+- Do not invoke other agents or skills. Do not dispatch trd-writer or task-writer — the 'Required next skill' section above dispatches downstream.
 - Do not modify source code, even if you spot bugs. Note them in Open questions if load-bearing.
 - Tool budget: ~15 Read/Grep/Glob calls. If you need more, halt and emit `error` with a `reason` describing the exhaustion.

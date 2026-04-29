@@ -19,4 +19,4 @@
 
 - `\b(make\s+it\s+(better|good|nice)|clean\s+it\s+up|improve\s+the\s+code)\b`
 
-`harness-flow.yaml` 과 동기화 유지.
+`skills/router/SKILL.md` 의 route 이름과 동기화 유지.

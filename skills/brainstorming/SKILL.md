@@ -14,6 +14,10 @@ Brainstorming is the harness's **intake skill**. It owns two responsibilities:
 
 The skill never proposes solutions, never writes specs, and never drafts code. Its product is a single route payload that downstream writers (`prd-writer` / `trd-writer` / `task-writer`) can trust.
 
+## Execution mode
+
+**Main context.** 메인 thread 가 직접 실행. Q&A 와 분류 단계는 사용자와의 대화가 필요해 격리 컨텍스트로 갈 수 없음.
+
 ## Input
 
 Runs in the main thread with live conversation context. Payload from router:
@@ -40,29 +44,22 @@ Every run ends with **one** terminal payload. The final message is a single JSON
     "scope_hint": "single-file|subsystem|multi-system",
     "constraints": ["..."],
     "acceptance": "..."
-  },
-  "next": "prd-writer"
+  }
 }
 ```
-
-Routing per `harness-flow.yaml` (`next` is the **immediate** downstream node):
-
-- `prd-trd` / `prd-only` → `next: "prd-writer"`
-- `trd-only` → `next: "trd-writer"`
-- `tasks-only` → `next: "task-writer"`
 
 `brainstorming_output` may be `null` when router handed off `plan` directly and the Q&A phase was skipped.
 
 **Pivot** — user turned away mid-intake:
 
 ```json
-{ "outcome": "pivot", "session_id": "...", "reason": "...", "next": null }
+{ "outcome": "pivot", "session_id": "...", "reason": "..." }
 ```
 
 **Casual re-classified** — user was asking a question, not requesting work:
 
 ```json
-{ "outcome": "exit-casual", "session_id": "...", "reason": "...", "next": null }
+{ "outcome": "exit-casual", "session_id": "...", "reason": "..." }
 ```
 
 Session files are written only on route outcomes (see B5/B7 in `references/procedure.md`). `STATE.md` `Last activity` is updated on every outcome. ROADMAP is untouched on `pivot` / `exit-casual`.
@@ -115,6 +112,18 @@ See `references/conversation-examples.md` for additional dialogue patterns (plan
 
 See `references/edge-cases.md` for pivot, casual reclassification, ambiguous answers, conflicting signals, intent-freeform handling, and other corner cases.
 
+## Required next skill
+
+The next skill depends on `outcome`:
+
+- `outcome == "prd-trd"` or `"prd-only"` → **REQUIRED SUB-SKILL:** Use harness-flow:prd-writer
+  Payload: `{ session_id, request, brainstorming_outcome: <outcome>, brainstorming_output }`
+- `outcome == "trd-only"` → **REQUIRED SUB-SKILL:** Use harness-flow:trd-writer
+  Payload: `{ session_id, request, brainstorming_outcome: "trd-only", brainstorming_output }`
+- `outcome == "tasks-only"` → **REQUIRED SUB-SKILL:** Use harness-flow:task-writer
+  Payload: `{ session_id, request, brainstorming_output }`
+- `outcome == "pivot"` or `"exit-casual"` → flow terminates. Report to the user and stop.
+
 ## Out of scope
 
 - Propose solutions, approaches, or tradeoffs — that's `prd-writer` / `trd-writer`.
@@ -122,7 +131,7 @@ See `references/edge-cases.md` for pivot, casual reclassification, ambiguous ans
 - Read the codebase beyond minimum needed to disambiguate a target name (≤ 2 tool calls; otherwise ask the user). No file-count estimation via codebase scan.
 - Estimate LOC or test coverage.
 - Promote tier at runtime based on actual diff.
-- Dispatch the next agent directly — main thread reads `outcome` and follows `harness-flow.yaml`.
+- Dispatch the next agent directly — main thread reads the "Required next skill" section below.
 - Re-ask questions the user already answered.
 - Re-invoke router — if pivot warrants a new session, end the skill; router fires next turn.
 - Write outside `ROADMAP.md` (Complexity line + brainstorming row) and `STATE.md` (Current Position + Last activity).

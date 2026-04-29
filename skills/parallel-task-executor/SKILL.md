@@ -36,6 +36,10 @@ digraph when {
 - Reads `.planning/{session_id}/TASKS.md` (and `ROADMAP.md`).
 - Emits one JSON object: `done | blocked | failed | error`. See `references/output-schemas.md`.
 
+## Execution mode
+
+**Main context.** 메인 thread 가 직접 실행. 자체가 task 들을 Task 툴로 병렬 dispatch 하는 오케스트레이터이므로 격리 컨텍스트가 아닌 메인에서 돌아야 함.
+
 ## Procedure (summary)
 
 1. Load + validate TASKS.md (env, shape, resume) → `references/procedure.md#step-1--load-and-validate-tasksmd`
@@ -44,7 +48,7 @@ digraph when {
 4. Build prompt from `references/subagent-prompt.md`; substitute `{executor-skill-path}` at dispatch time.
 5. Classify each return as DONE / BLOCKED / FAILED / skipped → `references/procedure.md#step-5--classify-each-subagent-return`
 6. Write `[Result]` block per task → `references/result-block-format.md`
-7. Finalize ROADMAP.md, resolve `next`, emit JSON → `references/procedure.md#step-7--finalize-roadmapmd-resolve-next-emit`
+7. Finalize ROADMAP.md, emit JSON → `references/procedure.md#step-7--finalize-roadmapmd-resolve-next-emit`
 
 ## Why this shape
 
@@ -52,6 +56,15 @@ digraph when {
 - **Three failure classes (blocked / failed / error) prevent retry loops on wrong-task bugs.** BLOCKED = task text is wrong, retry won't help. FAILED = attempt was wrong, retry up to the cap.
 - **3-attempt task-local cap is the only retry.** No session-level loop. The cap spans the session via TASKS.md `[Result]` blocks so a conversation restart cannot unbound it.
 - **Subagents are self-contained.** They do not read PRD/TRD or other tasks — task-writer's "verbatim, no placeholders" rule makes the task text sufficient.
+
+## Required next skill
+
+When this skill emits `outcome: "done"`:
+
+- **REQUIRED SUB-SKILL:** Use harness-flow:evaluator
+  Payload: `{ session_id, tasks_path: ".planning/{session_id}/TASKS.md", rules_dir, diff_command }`
+
+On `outcome: "blocked"` / `"failed"` / `"error"`: flow terminates. Report the failure detail to the user and stop. (Evaluator does not run on a non-done outcome — fixing blockers is a human decision.)
 
 ## Anti-patterns
 
@@ -66,6 +79,6 @@ digraph when {
 
 - `references/procedure.md` — full Step 1-7 detail.
 - `references/subagent-prompt.md` — prompt template per subagent.
-- `references/output-schemas.md` — JSON variants + `error → evaluator` cascade.
+- `references/output-schemas.md` — JSON variants.
 - `references/result-block-format.md` — `[Result]` block + status deltas.
 - `references/test-driven-development.md` — TDD discipline applied per task.

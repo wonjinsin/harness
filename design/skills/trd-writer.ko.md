@@ -13,6 +13,10 @@ payload schema, output JSON, error taxonomy, 공통 anti-pattern 은 `references
 
 이 스킬은 `session_id`, `request`, optional `prd_path` (상류에서 PRD 가 만들어졌으면 세팅, 아니면 `null`), `brainstorming_outcome` (`"prd-trd"` 또는 `"trd-only"` — 필수), 그리고 optional `brainstorming_output` 을 받는다.
 
+## 실행 모드
+
+**Subagent (격리 컨텍스트).** 메인 thread 가 Skill 툴로 SKILL.md 를 로드한 뒤 Task 툴로 별도 dispatch. 서브에이전트는 payload 외 메인 대화 히스토리에 접근 불가.
+
 ## 왜 이 스킬이 존재하나
 
 TRD 는 "코드에서 실제로 무엇이 바뀌고, 왜 이 모양인가" 에 답한다 — PRD 의 결과 중심 요구사항과도 다르고, TASKS 의 단계별 지시와도 다르다. 유일한 분기는 §1 (Context): PRD 가 있으면 상류 goal 을 인용하고, 없으면 기술 동기를 직접 기술. 본문 shape 은 동일해서 하류는 어느 상류가 먹였는지 신경 안 씀.
@@ -57,11 +61,18 @@ TRD 한정 anti-pattern (`references/contract.md` 의 공통 항목에 추가): 
 
 `.planning/{session_id}/` 없으면 만들고 `TRD.md` 작성. 파일이 이미 있으면 중단하고 `references/contract.md` 의 `error` 형식대로 emit.
 
-### Step 5 — `next` 결정 후 emit
-
-`using-harness § Core loop` 단계 3–5 에 따라: 유일한 후보는 `task-writer`. `done` 이면 `next: "task-writer"` (`prd-trd` · `trd-only` 둘 다 여길 통과). `error` 면 `next: null`.
+### Step 5 — Emit
 
 최종 JSON emit. 이게 최종 메시지 전부.
+
+## 필수 다음 스킬
+
+이 스킬이 `outcome: "done"` 을 emit 하면:
+
+- **필수 하위 스킬:** harness-flow:task-writer 사용
+  Payload: `{ session_id, request, prd_path, trd_path, brainstorming_output }`
+
+`outcome: "error"` 인 경우: 흐름 종료. 사용자에게 보고하고 멈춘다.
 
 ## Edge cases
 
@@ -74,6 +85,6 @@ TRD 한정 anti-pattern (`references/contract.md` 의 공통 항목에 추가): 
 ## Boundaries
 
 - `.planning/{session_id}/TRD.md` 에만 쓴다. PRD.md, ROADMAP.md, STATE.md 는 건드리지 말 것 — PRD.md 는 상류 read-only.
-- 다른 agent 나 skill 호출 금지. task-writer dispatch 금지 — 메인 스레드가 harness-flow.yaml 따름.
+- 다른 agent 나 skill 호출 금지. task-writer dispatch 금지 — 위의 '필수 다음 스킬' 섹션이 하류로 디스패치한다.
 - 탐색 중 버그를 발견해도 소스 코드 수정 금지. load-bearing 이면 Open questions 에.
 - Tool 예산: Read/Grep/Glob ~25회. 더 필요하면 중단하고 `error` + `reason` 으로 기록.

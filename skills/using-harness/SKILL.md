@@ -1,49 +1,25 @@
 ---
 name: using-harness
-description: Use when any harness skill finishes, when a user message may start a flow, or at session start — explains how to read harness-flow.yaml and dispatch the next node.
+description: Loaded at session start — defines when to engage the harness flow and how to enter it.
 ---
 
 # Using Harness
 
-**Harness DAG file**: `${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml` (plugin root, **not** user CWD — the SessionStart hook injects the resolved absolute path; never read it as a relative path). **You = interpreter.** No runtime engine: read the YAML, dispatch the next node yourself. Session artifacts live under `.planning/{session_id}/` (relative — written into the user's project).
+The harness is a chained planning + execution flow that turns a feature/bug request into PRD/TRD/TASKS, executes, evaluates, and updates docs. Each skill's SKILL.md declares its own next skill in a "Required next skill" section — follow those markers in order.
 
-## Core loop
+## When to engage
 
-After any skill completes (or a user message arrives):
+- **Casual chat / question** ("hi", "what does X mean?", "how do I…?") → answer directly. Do not invoke the harness.
+- **Build / fix / refactor / migrate request** ("add 2FA to login", "fix the broken test", "refactor session handling") → invoke `Skill("harness-flow:router")` as your first action. Router decides whether to clarify, plan, or resume.
 
-1. **Re-read the harness DAG file** at `${CLAUDE_PLUGIN_ROOT}/docs/harness/harness-flow.yaml` (~60 lines, cheap).
-2. **Identify current position** — which node just finished? What was its output JSON?
-3. **Find candidate next nodes** — any node whose `depends_on` includes the node you just ran.
-4. **Substitute & evaluate `when:`** — replace `$<id>.output.<field>` with actual values from recent outputs, evaluate the boolean (`==`, `||`, `&&`).
-5. **Apply `trigger_rule`** — default requires every `depends_on` to have completed; `one_success` fires as soon as one dep produced a matching output.
-6. **Invoke the first matching node.** Skills are registered by name when the plugin loads — prefer the `Skill` tool with the bare command name (e.g. `Skill("router")`). If the registry lookup fails, fall back to `Read` on `${CLAUDE_PLUGIN_ROOT}/skills/<command>/SKILL.md`.
-7. **No match → flow terminates.** Report final outcome to the user.
+## Skill priority
 
-## Downstream self-lookup (the `next` field)
+When a harness skill's "Required next skill" section names a follow-up, run it before any other skill the conversation might also match. Treat the chain as load-bearing — skipping a step (e.g. going straight from brainstorming to executor) breaks payload threading.
 
-Every harness skill emits a `next` field resolved by running steps 1–5 of the Core loop on its own outgoing edges. See `references/design-rationale.md` for why every skill performs the lookup itself. See `references/payload-threading.md` for which payload fields each node must thread.
+## Execution mode
 
-## Starting the flow
+Each SKILL.md declares its own `## Execution mode` — either "Main context" (run inline) or "Subagent (격리 컨텍스트)" (dispatch via Task tool with the procedure as the prompt). Honor that declaration when invoking.
 
-On the first user message of a session:
+## Session artifacts
 
-- **Casual chat / question** (no planning or building intent) → respond normally. Do not engage the harness.
-- **Feature / bug / project / "help me build X" request** → invoke `router` (entry node — no `depends_on` in `harness-flow.yaml`).
-
-At flow start, generate `session_id = "YYYY-MM-DD-{slug}"` where slug is a 2-4 word kebab-case summary of the request. Thread this through every subsequent skill invocation.
-
-## Output contract
-
-Every harness skill emits a single JSON object as its final message:
-
-```json
-{"outcome": "<value>", "session_id": "<id>", "next": "<node-id>" | null, ...}
-```
-
-On error: `outcome: "error"`, add `reason: "<one line>"`, `next: null`. Re-derive your dispatch from `outcome`; treat the skill's `next` as a cross-check signal — log if it disagrees.
-
-## Rules
-
-- **Missing `outcome` field** in a skill's output → treat as flow termination, report to user.
-- **Don't recurse endlessly** — if you've invoked the same node twice in a session without making progress, stop and ask the user.
-- See the schema header at the top of `harness-flow.yaml` for `when:` expression syntax, `context: fresh` semantics, and tiebreak rules.
+`.planning/{session_id}/` (relative to user CWD): `ROADMAP.md`, `STATE.md`, `PRD.md`, `TRD.md`, `TASKS.md`, `findings.md`.

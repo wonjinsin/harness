@@ -4,7 +4,7 @@
 
 ## Step 0 — 재개 숏서킷
 
-`resume: true` 이면 `.planning/{session_id}/ROADMAP.md` 를 읽는다. `Complexity: X` 줄 (X ∈ prd-trd / prd-only / trd-only / tasks-only) 이 있고 **동시에** `brainstorming` phase 가 `[x]` 면 **다시 인테이크하지 않는다**. `harness-flow.yaml` 의 다음 미완료 phase 로 향하는 경로 payload 를 emit 하고 종료. 근거: 지난 세션에서 이미 결정한 경로를 다시 묻는 건 턴을 낭비하고 신뢰를 깎는다.
+`resume: true` 이면 `.planning/{session_id}/ROADMAP.md` 를 읽는다. `Complexity: X` 줄 (X ∈ prd-trd / prd-only / trd-only / tasks-only) 이 있고 **동시에** `brainstorming` phase 가 `[x]` 면 **다시 인테이크하지 않는다**. 다음 미완료 phase 로 향하는 경로 payload 를 emit 하고 종료 (메인 thread 가 거기서 SKILL.md 의 "Required next skill" 마커를 따라간다). 근거: 지난 세션에서 이미 결정한 경로를 다시 묻는 건 턴을 낭비하고 신뢰를 깎는다.
 
 `resume: true` 인데 분류 기록이 없으면 (예: Gate 1 중간에 끊긴 세션) Phase A 를 건너뛰고 Phase B 부터 정상 진행 (router 가 `resume` 으로 분류했다는 건 사전 신호가 충분하다는 뜻).
 
@@ -161,11 +161,6 @@ B3 에서 tasks-only 후보가 나왔을 때만 실행. 네 개 모두 체크:
    - 상단 근처에 `Complexity: {route} ({expansion})` 줄 추가/갱신.
    - `- [ ] brainstorming` → `- [x] brainstorming    → {route} (approved)`. `user_overrode` 면 `→ {route} (overridden from {recommended-route})` 로 표기. user_overrode 플래그는 이 한 줄 우측 라벨에만 산다 — 별도 `gate-1-approval` 체크박스는 두지 않는다 (Gate 1 이 brainstorming 에 흡수돼 두 줄로 표현하면 중복).
 2. **`STATE.md` 갱신**:
-   - `Current Position: {harness-flow.yaml 기준 다음 phase}`
+   - `Current Position: {다음 phase — route 이름이 writer 를 함의}`
    - `Last activity: {ISO 타임스탬프} — classified as {route}{, 필요 시 user-overrode}`
-3. **`next` 결정** — `using-harness § Core loop` 단계 3–5 에 따라 이 스킬의 outgoing edge 들을 두고 다음 노드 lookup 을 수행. 경로 → first-listed-candidate 규칙으로 결정 테이블이 고정된다:
-   - `prd-trd` / `prd-only` → `prd-writer`
-   - `trd-only` → `trd-writer`
-   - `tasks-only` → `task-writer`
-   - `pivot` / `exit-casual` → `null` (매칭되는 edge 없음)
-4. **경로 payload 를 마지막 메시지로 emit** — `outcome` 은 경로 이름 (`prd-trd`/`prd-only`/`trd-only`/`tasks-only`), `next` 는 결정된 하위 노드 id. 메인 스레드가 `harness-flow.yaml` 의 `when:` 식을 평가해 맞는 writer agent 로 dispatch (`next` 와 교차 검증).
+3. **경로 payload 를 마지막 메시지로 emit** — `outcome` 은 경로 이름 (`prd-trd` / `prd-only` / `trd-only` / `tasks-only` / `pivot` / `exit-casual`). 메인 스레드가 SKILL.md 의 "Required next skill" 섹션을 읽어 맞는 writer 로 dispatch.

@@ -26,14 +26,16 @@ The final message is always one JSON object — no prose alongside. The main thr
 **done** — file written:
 
 ```json
-{ "outcome": "done", "session_id": "2026-04-19-...", "next": "<resolved-by-step-5-or-6>" }
+{ "outcome": "done", "session_id": "2026-04-19-...", "path": ".planning/2026-04-19-.../TASKS.md" }
 ```
 
 **error** — payload defect, file conflict, missing upstream, or unrecoverable exploration gap:
 
 ```json
-{ "outcome": "error", "session_id": "2026-04-19-...", "reason": "<short cause>", "next": null }
+{ "outcome": "error", "session_id": "2026-04-19-...", "reason": "<short cause>" }
 ```
+
+Output is consumed by the main thread to construct the next skill's payload.
 
 The output path is deterministic from `session_id`; the main thread reconstructs it. If the target file already exists, emit `error` — **never overwrite**. Regeneration is the main thread's call: it deletes the old file first, then re-dispatches.
 

@@ -26,16 +26,16 @@ The final message is always one JSON object — no prose alongside. The main thr
 **done** — file written:
 
 ```json
-{ "node_id": "prd-writer", "outcome": "done", "session_id": "2026-04-19-...", "brainstorming_outcome": "prd-trd", "path": ".planning/2026-04-19-.../PRD.md", "next": "<resolved-by-step-5-or-6>" }
+{ "outcome": "done", "session_id": "2026-04-19-...", "brainstorming_outcome": "prd-trd", "path": ".planning/2026-04-19-.../PRD.md" }
 ```
 
 **error** — payload defect, file conflict, missing upstream, or unrecoverable exploration gap:
 
 ```json
-{ "node_id": "prd-writer", "outcome": "error", "session_id": "2026-04-19-...", "reason": "<short cause>", "next": null }
+{ "outcome": "error", "session_id": "2026-04-19-...", "reason": "<short cause>" }
 ```
 
-`node_id` is required: the Stop hook dispatcher (`hooks/dispatch-next.js`) reads this field to identify which node just emitted, then computes the next node from `harness-flow.yaml`. `brainstorming_outcome` is echoed back so the dispatcher can evaluate downstream `when:` expressions without re-reading the original payload.
+Output is consumed by the main thread to construct the next skill's payload.
 
 The output path is deterministic from `session_id`; the main thread reconstructs it. If the target file already exists, emit `error` — **never overwrite**. Regeneration is the main thread's call: it deletes the old file first, then re-dispatches.
 
