@@ -44,8 +44,6 @@ On error: `outcome: "error"`, add `reason: "<one line>"`, `next: null`. Re-deriv
 
 ## Rules
 
-- **Strict `==`** in `when:` expressions (exact string match, not fuzzy).
-- **Multiple candidates match** → pick the first listed in `harness-flow.yaml`.
 - **Missing `outcome` field** in a skill's output → treat as flow termination, report to user.
 - **Don't recurse endlessly** — if you've invoked the same node twice in a session without making progress, stop and ask the user.
-- **`context: fresh` nodes** → run via subagent (`Task` / `Agent`) when available; subagents emit `next` as a hint only — main thread stays the dispatcher.
+- See the schema header at the top of `harness-flow.yaml` for `when:` expression syntax, `context: fresh` semantics, and tiebreak rules.

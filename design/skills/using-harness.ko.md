@@ -44,8 +44,6 @@ description: harness 스킬이 끝났을 때, 새 user 메시지가 flow 를 시
 
 ## 규칙
 
-- **`when:` 은 엄격한 `==`** (정확한 문자열 매치, 퍼지 금지).
-- **다중 매칭** → `harness-flow.yaml` 에 먼저 나열된 노드 우선.
 - **스킬 출력에 `outcome` 필드 부재** → 플로우 종료 처리, 유저에게 보고.
 - **무한 재귀 금지** — 같은 노드를 세션 내에서 두 번 invoke 했는데 진척 없으면 멈추고 유저에게 질문.
-- **`context: fresh` 노드** → `Task` / `Agent` 가용 시 subagent 로 실행. subagent 는 `next` 를 힌트로만 방출하고 디스패처는 여전히 메인 스레드.
+- `when:` 표현식 syntax, `context: fresh` 의미, tiebreak 규칙은 `harness-flow.yaml` 상단의 schema 헤더 참조.
