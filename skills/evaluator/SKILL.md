@@ -227,10 +227,10 @@ The same shape applies when the source is `Status: failed` — only the `reason`
 
 ## Required next skill
 
-When this skill emits `outcome: "pass"`:
+When this skill emits `outcome: "pass"` (full payload contract: `../../harness-contracts/payload-contract.md` § "evaluator → doc-updater"):
 
 - **REQUIRED SUB-SKILL:** Use harness-flow:doc-updater
-  Payload: `{ session_id, tasks_path, diff_command }`
+  Payload: `{ session_id, tasks_path, diff_command? }`
 
 On `outcome: "escalate"` or `"error"`: flow terminates. Report the verdict to the user (with the `reason` and any rule violations) and stop. Doc updates are gated on a passing evaluation — never auto-emit on escalate.
 

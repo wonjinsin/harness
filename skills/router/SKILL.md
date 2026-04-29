@@ -78,16 +78,18 @@ Leave the files empty of task content. Downstream skills (`prd-writer`, `trd-wri
 
 ### Step 5 — Emit
 
-Build a single JSON object with `outcome` and `session_id`. **Skip JSON entirely for `casual`** — reply to the user in plain text and end.
+Build a single JSON object with two fields and emit it as the entire final message: `{ outcome, session_id }`. **Skip JSON entirely for `casual`** — reply to the user in plain text and end.
 
-| Outcome | Payload |
-|---------|---------|
+| Outcome | Emission |
+|---------|----------|
 | `casual` | — (no JSON, inline reply) |
-| `clarify` | `{ request, session_id, route: "clarify" }` |
-| `plan` | `{ request, session_id, route: "plan" }` |
-| `resume` | `{ request, session_id, route: "resume", resume: true }` |
+| `clarify` | `{ "outcome": "clarify", "session_id": "..." }` |
+| `plan` | `{ "outcome": "plan", "session_id": "..." }` |
+| `resume` | `{ "outcome": "resume", "session_id": "..." }` |
 
 `resume` is its own outcome — not a boolean flag on `plan`. When Step 1 matches an existing session, emit `outcome: "resume"`; otherwise `plan`.
+
+The downstream payload that the main thread constructs from this emission (renaming `outcome` → `route` and adding `request`/`resume?`) is documented in `../../harness-contracts/payload-contract.md` under "router → brainstorming".
 
 ## Classification signals
 
@@ -216,10 +218,10 @@ Input: `let's continue the 2FA work from yesterday` (match found in `.planning/2
 
 ## Required next skill
 
-The next skill depends on `outcome`:
+The next skill depends on `outcome` (full payload contract: `../../harness-contracts/payload-contract.md` § "router → brainstorming"):
 
 - `outcome == "clarify"` or `"plan"` or `"resume"` → **REQUIRED SUB-SKILL:** Use harness-flow:brainstorming
-  Payload: `{ session_id, request, route: <outcome>, resume?: true }`
+  Payload: `{ session_id, request, route: <outcome>, resume?: true }` — the main thread renames `outcome` → `route` because brainstorming reserves `outcome` for its own emission.
 - `outcome == "casual"` → no JSON emitted; flow does not engage. Reply directly to the user and stop.
 
 ## Keyword catalogue

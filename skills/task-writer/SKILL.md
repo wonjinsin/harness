@@ -96,10 +96,10 @@ Emit the final JSON as your entire final message. Task-writer's `done` example (
 
 ## Required next skill
 
-When this skill emits `outcome: "done"`:
+When this skill emits `outcome: "done"` (full payload contract: `../../harness-contracts/payload-contract.md` § "task-writer → parallel-task-executor"):
 
 - **REQUIRED SUB-SKILL:** Use harness-flow:parallel-task-executor
-  Payload: `{ session_id }` — the executor reads `.planning/{session_id}/TASKS.md` directly.
+  Payload: `{ session_id }` — the executor reads `.planning/{session_id}/TASKS.md` from disk directly, so `path` is not threaded through.
 
 On `outcome: "error"`: flow terminates. Report to the user and stop.
 

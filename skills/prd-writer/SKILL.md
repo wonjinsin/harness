@@ -72,12 +72,12 @@ Required fields:
 
 ## Required next skill
 
-The next skill depends on `brainstorming_outcome` (echoed in this skill's output):
+The next skill depends on `brainstorming_outcome` (echoed in this skill's output; full payload contract: `../../harness-contracts/payload-contract.md` § "prd-writer → *"):
 
 - `brainstorming_outcome == "prd-trd"` → **REQUIRED SUB-SKILL:** Use harness-flow:trd-writer
-  Payload: `{ session_id, request, prd_path, brainstorming_outcome: "prd-trd", brainstorming_output }`
+  Payload: `{ session_id, request, prd_path, brainstorming_outcome: "prd-trd", brainstorming_output }` — `prd_path` is constructed from this skill's `path`.
 - `brainstorming_outcome == "prd-only"` → **REQUIRED SUB-SKILL:** Use harness-flow:task-writer
-  Payload: `{ session_id, request, prd_path, brainstorming_output }`
+  Payload: `{ session_id, request, prd_path, trd_path: null, brainstorming_output }`
 - On `outcome: "error"` → flow terminates. Report to the user and stop.
 
 ## Edge cases

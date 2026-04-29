@@ -71,10 +71,10 @@ Emit the final JSON as your entire final message. TRD-writer's `done` example (s
 
 ## Required next skill
 
-When this skill emits `outcome: "done"`:
+When this skill emits `outcome: "done"` (full payload contract: `../../harness-contracts/payload-contract.md` § "trd-writer → task-writer"):
 
 - **REQUIRED SUB-SKILL:** Use harness-flow:task-writer
-  Payload: `{ session_id, request, prd_path, trd_path, brainstorming_output }`
+  Payload: `{ session_id, request, prd_path, trd_path, brainstorming_output }` — `trd_path` is constructed from this skill's `path`. `prd_path` may be `null` on the trd-only route.
 
 On `outcome: "error"`: flow terminates. Report to the user and stop.
 

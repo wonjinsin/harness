@@ -114,14 +114,14 @@ See `references/edge-cases.md` for pivot, casual reclassification, ambiguous ans
 
 ## Required next skill
 
-The next skill depends on `outcome`:
+The next skill depends on `outcome` (full payload contract: `../../harness-contracts/payload-contract.md` § "brainstorming → *"):
 
 - `outcome == "prd-trd"` or `"prd-only"` → **REQUIRED SUB-SKILL:** Use harness-flow:prd-writer
   Payload: `{ session_id, request, brainstorming_outcome: <outcome>, brainstorming_output }`
 - `outcome == "trd-only"` → **REQUIRED SUB-SKILL:** Use harness-flow:trd-writer
-  Payload: `{ session_id, request, brainstorming_outcome: "trd-only", brainstorming_output }`
+  Payload: `{ session_id, request, brainstorming_outcome: "trd-only", brainstorming_output, prd_path: null }`
 - `outcome == "tasks-only"` → **REQUIRED SUB-SKILL:** Use harness-flow:task-writer
-  Payload: `{ session_id, request, brainstorming_output }`
+  Payload: `{ session_id, request, brainstorming_output, prd_path: null, trd_path: null }`
 - `outcome == "pivot"` or `"exit-casual"` → flow terminates. Report to the user and stop.
 
 ## Out of scope

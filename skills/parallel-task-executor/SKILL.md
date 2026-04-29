@@ -59,10 +59,10 @@ Main context — see `../../harness-contracts/execution-modes.md`. The executor 
 
 ## Required next skill
 
-When this skill emits `outcome: "done"`:
+When this skill emits `outcome: "done"` (full payload contract: `../../harness-contracts/payload-contract.md` § "parallel-task-executor → evaluator"):
 
 - **REQUIRED SUB-SKILL:** Use harness-flow:evaluator
-  Payload: `{ session_id, tasks_path: ".planning/{session_id}/TASKS.md", rules_dir, diff_command }`
+  Payload: `{ session_id, tasks_path: ".planning/{session_id}/TASKS.md", rules_dir?, diff_command? }` — `tasks_path` is deterministic; `rules_dir` and `diff_command` come from main-thread configuration.
 
 On `outcome: "blocked"` / `"failed"` / `"error"`: flow terminates. Report the failure detail to the user and stop. (Evaluator does not run on a non-done outcome — fixing blockers is a human decision.)
 
