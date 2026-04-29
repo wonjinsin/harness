@@ -1,6 +1,7 @@
 ---
 name: task-writer
 description: 실행 직전 마지막 planning 단계로 실행 — trd-writer 뒤 (prd-trd 또는 trd-only 경로), prd-writer 뒤 (prd-only 경로), 또는 brainstorming 직후 (tasks-only 경로). `.planning/{session_id}/TASKS.md` 초안 — executor 의 유일한 진실 원천. 각 task 는 fresh subagent 가 재질의 없이 한 번에 끝낼 수 있는 PR-sized 단위이며, evaluator 가 PRD/TRD 어휘로 grep 하므로 어휘는 verbatim 보존. 격리 subagent 에서 실행.
+model: opus
 ---
 
 # Task Writer

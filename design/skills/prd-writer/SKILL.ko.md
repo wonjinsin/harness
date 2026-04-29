@@ -1,6 +1,7 @@
 ---
 name: prd-writer
 description: brainstorming 이 prd-trd 또는 prd-only 를 emit 한 뒤 실행. `.planning/{session_id}/PRD.md` 초안 — Goal, Acceptance criteria, Non-goals, Constraints, Open questions. 결과 중심 ("이 변경 후 X 가 참이다") 이지 엔지니어링 상세는 아님 — 그건 TRD/TASKS 의 몫. 세션당 PRD 하나, 격리 subagent 에서 실행되어 코드베이스 탐색이 메인 thread 를 오염시키지 않는다.
+model: sonnet
 ---
 
 # PRD Writer

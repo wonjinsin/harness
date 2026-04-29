@@ -1,6 +1,7 @@
 ---
 name: evaluator
 description: parallel-task-executor 가 done 을 emit 한 뒤 실행 — doc-updater 직전 게이트. TASKS.md 의 모든 `[Result]` 가 done 인지 검증하고 (아니면 첫 blocker 의 reason 을 인용해 escalate), (Track 2) 세션 diff 를 `.claude/rules/*.md` 에 대해 LLM 추론으로 판정한다. pass / escalate / error 를 emit; non-pass 는 세션을 종료시킨다 — loopback 없음. 격리된 subagent 에서 실행.
+model: opus
 ---
 
 # Evaluator

@@ -1,6 +1,7 @@
 ---
 name: task-writer
 description: Run as the final planning step before execution — after trd-writer (prd-trd or trd-only routes), after prd-writer (prd-only route), or directly after brainstorming (tasks-only route). Drafts `.planning/{session_id}/TASKS.md` — the executor's only source of truth. Each task is a PR-sized unit a fresh subagent can complete without clarification, with PRD/TRD vocabulary preserved verbatim because the evaluator greps on it. Runs in an isolated subagent.
+model: opus
 ---
 
 # Task Writer

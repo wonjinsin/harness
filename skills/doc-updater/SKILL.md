@@ -1,6 +1,7 @@
 ---
 name: doc-updater
 description: Run after evaluator emits pass — the harness's terminal node. Reflects session code changes into CHANGELOG.md (Keep-a-Changelog skeleton, one bullet per task classified into Added/Changed/Fixed/Security/Deprecated/Removed), README.md / CLAUDE.md / docs/**/*.md (≤20-line edits only; structural rewrites route to a human via findings.md), and writes `.planning/{session_id}/findings.md`. No translation, no version bumps, no new doc files beyond the four targets. Runs in an isolated subagent.
+model: sonnet
 ---
 
 # Doc Updater

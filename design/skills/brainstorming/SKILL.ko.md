@@ -1,6 +1,7 @@
 ---
 name: brainstorming
-description: router 가 clarify, plan, 또는 resume 를 방출한 직후 harness intake 단계로 실행. 요청에 신호가 부족할 때(clarify 경로)만 짧은 Q&A 루프를 돌리고, 네 가지 하위 경로(prd-trd, prd-only, trd-only, tasks-only) 중 하나로 분류한 뒤 아티팩트 생성 전 Gate 1 유저 승인을 흡수. 해결책 제안·스펙 작성·코드베이스 탐색은 하지 않음 — target 이름 모호성 해소를 위한 최소 탐색만 허용. 산출물은 prd-writer / trd-writer / task-writer 가 신뢰할 수 있는 단일 경로 payload.
+description: router 가 clarify, plan, 또는 resume 를 방출한 직후 harness intake 단계로 실행. 요청에 신호가 부족할 때(clarify 경로) 짧은 Q&A 루프를 돌린다 — 전제 자체가 모호하면 문제 공간을 먼저 발산하고, 그 뒤 필드 단위 인테이크로 좁힘. 네 가지 하위 경로(prd-trd, prd-only, trd-only, tasks-only) 중 하나로 분류한 뒤 아티팩트 생성 전 Gate 1 유저 승인을 흡수. 구현 해결책 제안·스펙 작성·코드베이스 탐색은 하지 않음 — target 이름 모호성 해소를 위한 최소 탐색만 허용. 산출물은 prd-writer / trd-writer / task-writer 가 신뢰할 수 있는 단일 경로 payload.
+model: opus
 ---
 
 # Brainstorming
@@ -9,10 +10,12 @@ description: router 가 clarify, plan, 또는 resume 를 방출한 직후 harnes
 
 Brainstorming 은 하네스의 **인테이크 스킬**이다. 두 가지 책임을 한 스킬에서 소유한다:
 
-1. **요청 명확화** — router 가 `clarify` 로 라우팅하면, 분류·드래프팅에 필요한 신호가 다 모일 때까지 짧은 Q&A 루프를 돈다.
+1. **요청 명확화** — router 가 `clarify` 로 라우팅하면, 분류·드래프팅에 필요한 신호가 다 모일 때까지 짧은 Q&A 루프를 돈다. Phase A 는 두 모드 중 하나로 진행:
+   - **Intake** (기본) — 요청에 intent 와 target 이 이미 보이면 남은 필드를 한 번에 하나씩 채운다.
+   - **Explore** — 요청이 아직 아이디어 단계라면 잠깐 발산해서 *문제 공간*을 매핑한 뒤, intake 로 수렴한다.
 2. **경로 분류** — `prd-trd` / `prd-only` / `trd-only` / `tasks-only` 중 하나 선정 후 **Gate 1** (아티팩트 생성 착수 전 유저 승인) 흡수.
 
-이 스킬은 절대 해결책을 제안하지 않고, 스펙·코드 작성도 하지 않는다. 산출물은 단 하나의 경로 payload — 하위 writer (`prd-writer` / `trd-writer` / `task-writer`) 가 신뢰할 수 있는.
+이 스킬은 **구현 해결책**을 제안하지 않고, 스펙·코드 작성도 하지 않는다. **Explore 모드는 방향성 옵션 (문제 공간 카테고리, 상위 모양) 까지는 제시할 수 있으나 구현 옵션은 절대 제안하지 않는다** — 이 경계가 brainstorming 을 `prd-writer` / `trd-writer` 와 분리시키는 핵심이다. 산출물은 하위 writer 가 신뢰할 수 있는 단 하나의 경로 payload.
 
 ## 실행 모드
 
@@ -67,25 +70,29 @@ Main context — `../../harness-contracts/execution-modes.ko.md` 참조. Brainst
 ## 프로세스 흐름
 
 1. **Step 0** — 재개 숏서킷 (이전에 분류된 경우 전부 스킵).
-2. **Phase A** — 명확화 (`route == "clarify"` 일 때만).
+2. **Phase A** — 명확화 (`route == "clarify"` 일 때만):
+   - **A-explore** — 요청에서 intent + target 둘 다 안 나올 때 먼저 발산해서 문제 공간을 매핑.
+   - **A-intake** — intent 또는 target 이 식별 가능해진 시점부터 빈 필드를 한 번에 하나씩 채움.
 3. **Phase B** — 분류 + Gate 1 유저 승인.
 
 ## 절차 요약
 
-| 단계 | 스텝 | 한 줄 설명 |
-| --- | --- | --- |
-| Step 0 | resume | ROADMAP 에 `Complexity:` + `brainstorming` 이 `[x]` 면 숏서킷. |
-| Phase A | A1 | 요청에서 먼저 추출; 필드 질문 전에 멀티-서브시스템 범위 플래그. |
-| Phase A | A2 | 턴당 빈 필드 하나, MC 선호, 유저 언어로 질문. |
-| Phase A | A3 | "그냥 시작" / "스킵" → 즉시 종료, 채워진 채로 Phase B. |
-| Phase A | A4 | 채워진 필드 확인을 독립 메시지로 — 다음 턴이 Phase B 진입. |
-| Phase B | B1 | 경로 신호 (`auth/`, `migrations/`, …) + 다국어 키워드 신호 탐지. |
-| Phase B | B2 | 정수 하나 N = 수정 + 신규 파일 베스트-게스. |
-| Phase B | B3 | 티어 규칙: 신호 있으면 prd-trd; 그 외엔 intent + N. |
-| Phase B | B4 | tasks-only 후보는 4개 자기검증 통과 필요, 하나라도 실패 → prd-only. |
-| Phase B | B5 | Gate 1 — 추천을 독립 메시지로 제시 후 대기. |
-| Phase B | B6 | 수락 / 경로 번복 / 파일 수 번복 (1회 재계산) / 피벗. |
-| Phase B | B7 | ROADMAP 에 `Complexity:` + `brainstorming` 행 체크, STATE 갱신, payload emit. |
+| 단계    | 스텝      | 한 줄 설명                                                                            |
+| ------- | --------- | ------------------------------------------------------------------------------------- |
+| Step 0  | resume    | ROADMAP 에 `Complexity:` + `brainstorming` 이 `[x]` 면 숏서킷.                        |
+| Phase A | A1        | 요청에서 먼저 추출; 필드 질문 전에 멀티-서브시스템 범위 플래그.                       |
+| Phase A | A1.5      | 모드 선택 — A-explore (intent + target 둘 다 없음) vs A-intake (필드 일부 추출 가능). |
+| Phase A | A-explore | 열린 질문·방향성 MC 로 발산하다 intent + target 안정화되면 전이.                      |
+| Phase A | A2        | 턴당 빈 필드 하나, MC 선호, 유저 언어로 질문.                                         |
+| Phase A | A3        | "그냥 시작" / "스킵" → 즉시 종료, 채워진 채로 Phase B.                                |
+| Phase A | A4        | 채워진 필드 확인을 독립 메시지로 — 다음 턴이 Phase B 진입.                            |
+| Phase B | B1        | 경로 신호 (`auth/`, `migrations/`, …) + 다국어 키워드 신호 탐지.                      |
+| Phase B | B2        | 정수 하나 N = 수정 + 신규 파일 베스트-게스.                                           |
+| Phase B | B3        | 티어 규칙: 신호 있으면 prd-trd; 그 외엔 intent + N.                                   |
+| Phase B | B4        | tasks-only 후보는 4개 자기검증 통과 필요, 하나라도 실패 → prd-only.                   |
+| Phase B | B5        | Gate 1 — 추천을 독립 메시지로 제시 후 대기.                                           |
+| Phase B | B6        | 수락 / 경로 번복 / 파일 수 번복 (1회 재계산) / 피벗.                                  |
+| Phase B | B7        | ROADMAP 에 `Complexity:` + `brainstorming` 행 체크, STATE 갱신, payload emit.         |
 
 `references/procedure.ko.md` 에 전체 Q&A 프로토콜.
 
@@ -106,7 +113,7 @@ Main context — `../../harness-contracts/execution-modes.ko.md` 참조. Brainst
 > User: "네"
 > Brainstorming: [ROADMAP 확정, `{"outcome": "trd-only", ...}` emit]
 
-`references/conversation-examples.ko.md` 에 추가 대화 패턴 (plan 경로 신호 승격, tasks-only 강등, 유저 번복, 다중 프로젝트 분해, 나쁜 예들).
+`references/conversation-examples.ko.md` 에 추가 대화 패턴 — **explore → intake** 흐름 (아이디어 단계에서 분류된 경로까지), plan 경로 신호 승격, tasks-only 강등, 유저 번복, 다중 프로젝트 분해, 나쁜 예들.
 
 ## 엣지 케이스
 
@@ -114,7 +121,7 @@ Main context — `../../harness-contracts/execution-modes.ko.md` 참조. Brainst
 
 ## 필수 다음 스킬
 
-다음 스킬은 `outcome` 에 따라 결정됨 (전체 payload 계약: `../../harness-contracts/payload-contract.ko.md` § "brainstorming → *"):
+다음 스킬은 `outcome` 에 따라 결정됨 (전체 payload 계약: `../../harness-contracts/payload-contract.ko.md` § "brainstorming → \*"):
 
 - `outcome == "prd-trd"` 또는 `"prd-only"` → **필수 하위 스킬:** harness-flow:prd-writer 사용
   Payload: `{ session_id, request, brainstorming_outcome: <outcome>, brainstorming_output }`
@@ -127,7 +134,7 @@ Main context — `../../harness-contracts/execution-modes.ko.md` 참조. Brainst
 ## 범위 밖
 
 - 파일 소유권: `../../harness-contracts/file-ownership.ko.md` 참조. Brainstorming 은 `ROADMAP.md` 의 `Complexity:` 줄 + brainstorming 행, `STATE.md` 의 `Current Position` + `Last activity` 만 쓴다. 그 외는 범위 밖.
-- 해결책·접근법·트레이드오프 제안 — `prd-writer` / `trd-writer` 의 몫.
+- **구체적인** 해결책·접근법·구현 트레이드오프 제안 — `prd-writer` / `trd-writer` 의 몫. Explore 모드는 방향성 옵션 (문제 공간 카테고리, 상위 모양 — 예: 알림 요청에 대해 "푸시 / 이메일 / 인앱") 까지는 제시할 수 있다 (인테이크 프레이밍 용도). 구현 선택지 (라이브러리, 아키텍처, 파일 구조) 는 제안 금지.
 - 스펙·디자인·플랜 / 코드 작성.
 - 코드베이스 탐색 — target 이름 모호성 해소에 꼭 필요한 최소한 (≤ 2 tool call) 외 금지. 파일 수 추정 위한 코드베이스 스캔도 금지.
 - LOC / 테스트 커버리지 추정.

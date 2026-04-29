@@ -1,6 +1,7 @@
 ---
 name: using-harness
 description: Loaded at session start as the meta-skill. Defines when to engage the harness chain (build/fix/refactor/migrate requests → invoke router as the first action; casual chat → reply inline without invoking) and how skill priority works (each skill's 'Required next skill' marker is load-bearing — follow it before any other skill the conversation might match). Points at `harness-contracts/` for the shared execution-modes, payload, and file-ownership contracts.
+model: haiku
 ---
 
 # Using Harness

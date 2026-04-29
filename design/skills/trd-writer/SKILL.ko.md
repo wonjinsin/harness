@@ -1,6 +1,7 @@
 ---
 name: trd-writer
 description: prd-writer (prd-trd 경로) 뒤 또는 brainstorming 직후 (trd-only 경로) 실행. `.planning/{session_id}/TRD.md` 초안 — 구체적 파일/함수 이름이 들어간 Affected surfaces, Interfaces & contracts, Data model, Risks. 코드 shape 수준: PRD 의 결과 중심 frame 과도, TASKS 의 단계별 지시와도 다르다. 세션당 TRD 하나, 격리 subagent 에서 실행.
+model: opus
 ---
 
 # TRD Writer

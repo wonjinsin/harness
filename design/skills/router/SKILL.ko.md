@@ -1,6 +1,7 @@
 ---
 name: router
 description: 다른 harness 스킬이 흐름 진행 중이며 명시적으로 다른 다음 스킬을 지정한 경우가 아니라면, 모든 user 턴의 가장 첫 단계에서 항상 실행. 요청을 casual (인라인 응답, JSON 없음), clarify (brainstorming 이 Q&A 진행), plan (brainstorming 이 충분한 신호 보유), 또는 resume (기존 `.planning/` 세션과 매칭) 으로 분류한다. 신규 plan/clarify 경로에서는 세션 슬러그와 `.planning/{session_id}/` 스캐폴드를 부트스트랩한다.
+model: haiku
 ---
 
 # Router

@@ -1,6 +1,7 @@
 ---
 name: doc-updater
 description: evaluator 가 pass 를 emit 한 뒤 실행 — harness 의 terminal node. 세션 코드 변경을 CHANGELOG.md (Keep-a-Changelog 스켈레톤, task 당 Added/Changed/Fixed/Security/Deprecated/Removed 분류 bullet), README.md / CLAUDE.md / docs/**/*.md (≤20줄 편집 한정; 구조적 재작성은 findings.md 를 통해 사람에게 위임), `.planning/{session_id}/findings.md` 에 반영. 번역·버전 범프·네 타겟 외 신규 문서 생성 없음. 격리 subagent 에서 실행.
+model: sonnet
 ---
 
 # Doc Updater

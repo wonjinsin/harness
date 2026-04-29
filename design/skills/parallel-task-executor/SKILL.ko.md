@@ -1,6 +1,7 @@
 ---
 name: parallel-task-executor
 description: task-writer 가 done 을 emit 한 뒤 실행. `TASKS.md` 의 각 task 를 Task 툴로 fresh subagent 1개씩 dispatch — DAG 레이어 내부는 병렬, `Files:` 가 겹치면 직렬화, 그룹당 최대 5개, task-local 3회 retry. task 별 `[Result]` 블록을 기록하고 ROADMAP.md 를 최종화한다. subagent 들을 fan out 하고 리턴을 집계하므로 메인 컨텍스트에 산다 — executor 자체는 소스 코드를 절대 편집하지 않는다 (dispatch 된 subagent 가 편집).
+model: sonnet
 ---
 
 # Parallel Task Executor

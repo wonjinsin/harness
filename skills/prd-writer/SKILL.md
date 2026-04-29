@@ -1,6 +1,7 @@
 ---
 name: prd-writer
 description: Run after brainstorming emits prd-trd or prd-only. Drafts `.planning/{session_id}/PRD.md` — Goal, Acceptance criteria, Non-goals, Constraints, Open questions. Outcome-framed ("after this change, X is true"), not engineering-detailed — that's TRD/TASKS. One PRD per session; runs in an isolated subagent so codebase exploration does not pollute the main thread.
+model: sonnet
 ---
 
 # PRD Writer

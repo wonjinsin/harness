@@ -1,6 +1,7 @@
 ---
 name: brainstorming
-description: Run as the harness intake step after router emits clarify, plan, or resume. Drives a tight Q&A loop only when the request lacks signal (clarify route), then classifies into one of four downstream routes (prd-trd, prd-only, trd-only, tasks-only) and absorbs Gate 1 user approval before any artifact is created. Never proposes solutions, writes specs, or reads the codebase beyond minimum target disambiguation — its only product is the route payload that prd-writer/trd-writer/task-writer can trust.
+description: Run as the harness intake step after router emits clarify, plan, or resume. Drives a tight Q&A loop when the request lacks signal (clarify route) — exploring the problem space first when even the premise is vague, then narrowing into field-by-field intake — and classifies into one of four downstream routes (prd-trd, prd-only, trd-only, tasks-only) while absorbing Gate 1 user approval before any artifact is created. Never proposes implementation solutions, writes specs, or reads the codebase beyond minimum target disambiguation — its only product is the route payload that prd-writer/trd-writer/task-writer can trust.
+model: opus
 ---
 
 # Brainstorming
@@ -9,10 +10,12 @@ description: Run as the harness intake step after router emits clarify, plan, or
 
 Brainstorming is the harness's **intake skill**. It owns two responsibilities:
 
-1. **Clarify the request** — when router routes `clarify`, drive a tight Q&A loop until the request has enough signal to classify and to draft.
+1. **Clarify the request** — when router routes `clarify`, drive a tight Q&A loop until the request has enough signal to classify and to draft. Phase A runs in one of two modes:
+   - **Intake** (default) — the request already names an intent and target; fill the remaining fields one per turn.
+   - **Explore** — the request is still at the idea stage; diverge briefly to map the _problem space_, then converge into intake.
 2. **Classify into a route** — pick `prd-trd` / `prd-only` / `trd-only` / `tasks-only`, then absorb **Gate 1** (user approval before artifact creation).
 
-The skill never proposes solutions, never writes specs, and never drafts code. Its product is a single route payload that downstream writers (`prd-writer` / `trd-writer` / `task-writer`) can trust.
+The skill never proposes implementation solutions, never writes specs, and never drafts code. **Explore mode may surface direction-mapping options (problem-space categories, high-level shape) but never implementation options** — that boundary is what keeps brainstorming separate from `prd-writer` / `trd-writer`. Its product is a single route payload that downstream writers can trust.
 
 ## Execution mode
 
@@ -67,25 +70,29 @@ Session files are written only on route outcomes (see B5/B7 in `references/proce
 ## Process flow
 
 1. **Step 0** — resume short-circuit (skip everything if previously classified).
-2. **Phase A** — clarify (only if `route == "clarify"`).
+2. **Phase A** — clarify (only if `route == "clarify"`):
+   - **A-explore** runs first when intent + target are both unfillable from the request — diverge to map the problem space.
+   - **A-intake** runs when (or once) intent or target is identifiable — fill remaining fields one per turn.
 3. **Phase B** — classify + Gate 1 user approval.
 
 ## Procedure summary
 
-| Phase | Step | One-line description |
-| --- | --- | --- |
-| Step 0 | resume | Short-circuit if ROADMAP already has `Complexity:` and `brainstorming` is `[x]`. |
-| Phase A | A1 | Extract from request first; flag multi-subsystem scope before asking fields. |
-| Phase A | A2 | Ask one missing field per turn, MC-preferred, in user's language. |
-| Phase A | A3 | Early exit on "just start" / "skip" — proceed with whatever is filled. |
-| Phase A | A4 | Confirm fills as standalone message; next turn moves to Phase B. |
-| Phase B | B1 | Detect path signals (`auth/`, `migrations/`, …) + multilingual keyword signals. |
-| Phase B | B2 | Single integer N = best-guess modified + new files. |
-| Phase B | B3 | Tier rule: any signal → prd-trd; else by intent + N. |
-| Phase B | B4 | tasks-only candidate must pass 4 self-checks; any fail → prd-only. |
-| Phase B | B5 | Gate 1 — present recommendation as standalone message; wait. |
-| Phase B | B6 | Accept / route-override / file-count override (one recompute) / pivot. |
-| Phase B | B7 | Write `Complexity:` + check `brainstorming` row in ROADMAP, update STATE, emit payload. |
+| Phase   | Step      | One-line description                                                                               |
+| ------- | --------- | -------------------------------------------------------------------------------------------------- |
+| Step 0  | resume    | Short-circuit if ROADMAP already has `Complexity:` and `brainstorming` is `[x]`.                   |
+| Phase A | A1        | Extract from request first; flag multi-subsystem scope before asking fields.                       |
+| Phase A | A1.5      | Pick mode — A-explore (no intent + target) vs A-intake (fields partially fillable).                |
+| Phase A | A-explore | Diverge with open or direction-mapping questions until intent + target stabilise, then transition. |
+| Phase A | A2        | Ask one missing field per turn, MC-preferred, in user's language.                                  |
+| Phase A | A3        | Early exit on "just start" / "skip" — proceed with whatever is filled.                             |
+| Phase A | A4        | Confirm fills as standalone message; next turn moves to Phase B.                                   |
+| Phase B | B1        | Detect path signals (`auth/`, `migrations/`, …) + multilingual keyword signals.                    |
+| Phase B | B2        | Single integer N = best-guess modified + new files.                                                |
+| Phase B | B3        | Tier rule: any signal → prd-trd; else by intent + N.                                               |
+| Phase B | B4        | tasks-only candidate must pass 4 self-checks; any fail → prd-only.                                 |
+| Phase B | B5        | Gate 1 — present recommendation as standalone message; wait.                                       |
+| Phase B | B6        | Accept / route-override / file-count override (one recompute) / pivot.                             |
+| Phase B | B7        | Write `Complexity:` + check `brainstorming` row in ROADMAP, update STATE, emit payload.            |
 
 See `references/procedure.md` for the full Q&A protocol.
 
@@ -106,7 +113,7 @@ See `references/procedure.md` for the full Q&A protocol.
 > User: "yes"
 > Brainstorming: [commits ROADMAP, emits `{"outcome": "trd-only", ...}`]
 
-See `references/conversation-examples.md` for additional dialogue patterns (plan-path signal promotion, tasks-only demotion, user override, multi-project decomposition, and bad-pattern counter-examples).
+See `references/conversation-examples.md` for additional dialogue patterns — including the **explore → intake** flow (idea-stage to classified route), plan-path signal promotion, tasks-only demotion, user override, multi-project decomposition, and bad-pattern counter-examples.
 
 ## Edge cases
 
@@ -114,7 +121,7 @@ See `references/edge-cases.md` for pivot, casual reclassification, ambiguous ans
 
 ## Required next skill
 
-The next skill depends on `outcome` (full payload contract: `../../harness-contracts/payload-contract.md` § "brainstorming → *"):
+The next skill depends on `outcome` (full payload contract: `../../harness-contracts/payload-contract.md` § "brainstorming → \*"):
 
 - `outcome == "prd-trd"` or `"prd-only"` → **REQUIRED SUB-SKILL:** Use harness-flow:prd-writer
   Payload: `{ session_id, request, brainstorming_outcome: <outcome>, brainstorming_output }`
@@ -127,7 +134,7 @@ The next skill depends on `outcome` (full payload contract: `../../harness-contr
 ## Out of scope
 
 - File ownership: see `../../harness-contracts/file-ownership.md`. Brainstorming writes only the `Complexity:` line + brainstorming row in `ROADMAP.md`, and `Current Position` + `Last activity` in `STATE.md`. Anything else is out of scope.
-- Propose solutions, approaches, or tradeoffs — that's `prd-writer` / `trd-writer`.
+- Propose **specific** solutions, approaches, or implementation tradeoffs — that's `prd-writer` / `trd-writer`. Explore mode may surface direction-mapping options (problem-space categories, high-level shape — e.g. "push / email / in-app" for a notification request) because those frame the intake; it must not propose implementation choices (libraries, architectures, file structure).
 - Write specs, design docs, plans, or any code.
 - Read the codebase beyond minimum needed to disambiguate a target name (≤ 2 tool calls; otherwise ask the user). No file-count estimation via codebase scan.
 - Estimate LOC or test coverage.

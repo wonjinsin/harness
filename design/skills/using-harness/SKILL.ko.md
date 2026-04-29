@@ -1,6 +1,7 @@
 ---
 name: using-harness
 description: 세션 시작 시 메타 스킬로 로드. harness 체인에 진입할 시점(build/fix/refactor/migrate 요청 → router 를 첫 액션으로 invoke; 잡담은 invoke 없이 인라인 응답)과 스킬 우선순위 동작 방식(각 스킬의 'Required next skill' 마커는 load-bearing — 대화에서 매칭될 다른 어떤 스킬보다 먼저 따라야 함)을 정의. 공유 execution-modes / payload / file-ownership 계약은 `harness-contracts/` 를 가리킴.
+model: haiku
 ---
 
 # Using Harness

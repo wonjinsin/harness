@@ -28,6 +28,58 @@ If the user insists on tackling all of it as one session, proceed but record `co
 
 Skip the scope check for obviously single-scope requests — don't ask "is this one project?" for "fix the login timeout bug".
 
+### A1.5 — Pick mode: explore or intake
+
+After A1(a) extraction and A1(b) scope assessment, decide which sub-phase runs first:
+
+- **A-intake** (default): If A1(a) yielded at least one of `intent` or `target` from the request, skip A-explore and go straight to A2. Most clarify-routed requests land here — "make the auth code better" already pins target=auth, even though intent is fuzzy.
+- **A-explore**: Run when **both** `intent` and `target` are unfillable from the request, OR the user explicitly signals idea-stage ("아직 고민 중", "뭘 만들지 모르겠어", "I'm exploring", "not sure yet", "AI로 뭔가 해보고 싶은데 …"). The premise itself is the gap — asking field-by-field would feel like an interrogation before the user knows what they want.
+
+The mode is an internal routing decision; the user does not need to know the modes exist. The conversation should feel like one continuous Q&A.
+
+### A-explore — Diverge, then converge
+
+Goal: surface enough about the **problem space** that intake mode can start. **Not** to propose solutions.
+
+Allowed prompts:
+
+- Open questions about motivation — "What pain point sparked this?" / "어떤 문제가 이걸 시작하게 했어요?"
+- Problem-space neighbours — "Internal tool or user-facing?" / "혼자 쓸 거예요, 팀에 배포할 거예요?"
+- 2–3 direction-mapping multiple choice — high-level *shape categories*, NOT implementations:
+  - ✓ "Sounds like notifications — push, email, or in-app?"
+  - ✓ "이메일 자동화라면 — 초안만 보조하는 건지, 자동 발송까지 가는 건지?"
+  - ✗ "Use Pub/Sub vs cron vs polling?" — implementation choice, prd-writer / trd-writer's job.
+  - ✗ "Should we use Postgres or MongoDB?" — same.
+
+Procedure:
+
+1. Ask one open or direction-mapping question per turn, in the user's language.
+2. After every user reply, re-run A1(a) on the cumulative conversation. Did `intent` or `target` emerge?
+3. When **both** intent and target are reasonably pinned (you could write a one-line summary the user would agree with), confirm convergence as a standalone message in the user's language:
+   > "그러면 결국 {intent} {target} 방향이네요. 이제 나머지 디테일 잡아갈게요."
+   > or "Sounds like we're building {target} to {intent}. Let me pin down the rest."
+4. On the next turn, transition to A2 — but **do not re-ask anything already touched in explore**. Pre-fill what you can; only ask the remaining unfilled fields.
+
+Stuck after ~3 rounds without convergence:
+
+- Ask directly — "Hard to pick a single direction? We can prototype one and defer the others to later sessions."
+- If still no convergence, propose the most concrete direction discussed and proceed. Note `constraints: ["explore-forced-pick: <direction>"]` so the writer knows the foundation is thin.
+
+Early exit and pivot apply identically:
+
+- "그냥 시작해줘" / "skip" / "you decide" → A3 (early exit). Jump to Phase B with whatever fields are filled (likely thin payload — log in STATE).
+- User pivots to an unrelated topic → emit `pivot` payload, end skill (router fires next turn).
+
+The boundary that makes explore safe to live in this skill:
+
+| Layer | Explore mode | Out of scope (writers) |
+| --- | --- | --- |
+| Problem space | category, user, trigger, why-now | — |
+| Solution shape | what *kind* of thing (tool / dashboard / pipeline / bot) | — |
+| Implementation | — | library, framework, architecture, file structure |
+
+Crossing the line into implementation undermines the brainstorming → writer separation and erodes the "never propose solutions" guarantee that prd-writer / trd-writer rely on.
+
 ### A2 — Ask the missing fields, one at a time
 
 Priority order — **first unfilled field wins, but only after re-running A1(a) on the latest answer.** A single user reply often fills multiple fields at once (e.g., "refactor session handling for clarity" fills intent + target + partial scope). After every user turn, re-extract from the whole conversation before choosing the next question. Don't walk the list top-to-bottom blindly.

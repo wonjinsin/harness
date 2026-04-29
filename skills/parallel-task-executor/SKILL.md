@@ -1,6 +1,7 @@
 ---
 name: parallel-task-executor
 description: Run after task-writer emits done. Dispatches one fresh subagent per task in `TASKS.md` via the Task tool — parallel within DAG layers, serialized when `Files:` overlap, capped at 5 per group, with a 3-attempt task-local retry. Writes a `[Result]` block per task and finalizes ROADMAP.md. Lives in main context because it fans out subagents and aggregates returns; the executor itself never edits source code (its dispatched subagents do).
+model: sonnet
 ---
 
 # Parallel Task Executor

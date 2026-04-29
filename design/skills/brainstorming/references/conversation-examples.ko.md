@@ -2,6 +2,25 @@
 
 `SKILL.md` 에서 참조하는 추가 대화 패턴. trd-only 인증 리팩토링 케이스는 스킬 본문에 인라인으로 유지; 이 파일에는 나머지가 있다.
 
+## 좋은 예 — explore 경로, 아이디어 단계 → intake → prd-only
+
+> User: "AI로 뭔가 만들어보고 싶은데 뭘 할지 모르겠어"
+> Brainstorming: [A1(a) 결과 intent / target 둘 다 비어 있음 → A1.5 가 A-explore 선택]
+> Brainstorming: "어떤 문제를 풀고 싶으세요? 일상 작업 자동화 / 데이터 분석 / 콘텐츠 생성 같은 큰 방향 중 끌리는 게 있나요?"
+> User: "음, 일상 자동화 쪽인 듯. 이메일 답장 같은 거"
+> Brainstorming: "이메일 답장이라면 — 받은 메일에 초안을 만들어주는 보조인지, 자동 발송까지 가는 건지?"
+> User: "초안만 만들어주는 거"
+> Brainstorming: [A1(a) 재추출: intent=add (신규 도구), target=이메일 답장 초안 보조 — 둘 다 잡힘]
+> Brainstorming: "그러면 결국 이메일 답장 초안 보조 도구를 만드는 방향이네요. 이제 나머지 디테일 잡아갈게요."
+> [A2 로 전이]
+> Brainstorming: "범위는 — 단일 메일 클라이언트 통합(예: Gmail)으로 시작할까요, 여러 클라이언트 지원이 필요한가요?"
+> User: "Gmail 만"
+> Brainstorming: "확인 — add (신규 도구) 이메일 답장 초안 보조 (Gmail), subsystem 범위. 이제 경로를 고르겠습니다."
+> User: "ok"
+> Brainstorming: "**prd-only** (PRD → Tasks) 추천. 예상 3파일, 보안 신호 없음. 진행할까요?"
+> User: "네"
+> Brainstorming: [확정, `{"outcome": "prd-only", ...}` emit]
+
 ## 좋은 예 — plan 경로 (Phase A 스킵), 신호 승격
 
 > Router output: `{outcome: "plan", request: "로그인에 2FA 추가", session_id: "..."}`
@@ -35,6 +54,11 @@
 ## 나쁜 예 — 접근법 제안
 
 > Brainstorming: "세 가지 방법이 있습니다: A) 이름만 바꾸기 B) 함수 추출 C) 전면 재작성. 뭐가 좋을까요?"
+
+## 나쁜 예 — explore 모드가 구현으로 넘어감
+
+> User: "AI로 뭔가 만들어보고 싶어"
+> Brainstorming: "OpenAI API / Anthropic API / 로컬 Ollama 중에 어디로 갈까요?" ← 구현 선택; prd-writer / trd-writer 의 몫. intent + target 이 잡힐 때까지 문제 공간에 머물 것 ("어떤 문제를 풀고 싶으세요?").
 
 ## 나쁜 예 — 요청에 이미 있는 걸 되묻기
 
