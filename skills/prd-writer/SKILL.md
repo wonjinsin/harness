@@ -48,8 +48,6 @@ See `references/template.md` for the exact structure and `references/example.md`
 - Don't restate the user's request as Goal verbatim. Goal is the *outcome* — "after this change, X is true" — not the ask.
 - Tag assumptions in Open questions with `(assumed)`.
 
-PRD-specific anti-pattern (in addition to those in `../../harness-contracts/output-contract.md`): no engineering approach detail (library, interface) — that's TRD/TASKS.
-
 ### Step 4 — Write the file
 
 Create `.planning/{session_id}/` if it doesn't exist. Write `PRD.md`. If the file already exists, halt and emit `error` per `../../harness-contracts/output-contract.md`.
@@ -80,6 +78,12 @@ The next skill depends on `brainstorming_outcome` (echoed in this skill's output
   Payload: `{ session_id, request, prd_path, trd_path: null, brainstorming_output }`
 - On `outcome: "error"` → flow terminates. Report to the user and stop.
 
+## Anti-patterns
+
+PRD-specific (additional to those in `../../harness-contracts/output-contract.md`):
+
+- **No engineering approach detail.** Library choice, interface signatures, data shapes — that's TRD/TASKS. PRD says what becomes true after the change; TRD says what changes in code.
+
 ## Edge cases
 
 - **Request references files that don't exist**: investigate with Glob to confirm. If truly absent, add an Open question rather than inventing structure.
@@ -92,4 +96,4 @@ The next skill depends on `brainstorming_outcome` (echoed in this skill's output
 - File ownership: see `../../harness-contracts/file-ownership.md` (this skill = `PRD.md` row — create only; ROADMAP/STATE are read-or-skip; source code untouched).
 - Do not invoke other agents or skills. Do not dispatch trd-writer or task-writer — the 'Required next skill' section above dispatches downstream.
 - Do not modify source code, even if you spot bugs. Note them in Open questions if load-bearing.
-- Tool budget: ~15 Read/Grep/Glob calls. If you need more, halt and emit `error` with a `reason` describing the exhaustion.
+- Tool budget: ~15 Read/Grep/Glob calls — sized for scope-locating ("where does this land, what surrounds it"), not design-deep exploration. TRD's ~25 budget exists for the deeper pass; if you find yourself needing TRD-level detail, the request likely belongs on the prd-trd route. If you need more than ~15, halt and emit `error` with a `reason` describing the exhaustion.

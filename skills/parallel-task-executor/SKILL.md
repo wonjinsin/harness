@@ -54,6 +54,7 @@ Main context — see `../../harness-contracts/execution-modes.md`. The executor 
 
 - **DAG + file-overlap serialization prevents git conflicts subagents cannot fix.** Two subagents editing the same file in parallel each think they own it.
 - **Three failure classes (blocked / failed / error) prevent retry loops on wrong-task bugs.** BLOCKED = task text is wrong, retry won't help. FAILED = attempt was wrong, retry up to the cap.
+- **5-task dispatch cap.** A higher cap risks the parent assistant turn aging out before all parallel returns aggregate, and gives diminishing parallelism returns once the typical task-DAG width is exceeded.
 - **3-attempt task-local cap is the only retry.** No session-level loop. The cap spans the session via TASKS.md `[Result]` blocks so a conversation restart cannot unbound it.
 - **Subagents are self-contained.** They do not read PRD/TRD or other tasks — task-writer's "verbatim, no placeholders" rule makes the task text sufficient.
 

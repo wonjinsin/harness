@@ -35,7 +35,7 @@ Within each layer, check for **file overlap**: if two tasks in the same layer sh
 
 **How to extract paths from `Files:` entries**: take only the string inside backticks. Strip any `:N-M` line-range suffix before comparing (so `src/foo.ts:10-20` and `src/foo.ts:50-80` both resolve to `src/foo.ts` and are considered an overlap — two subagents cannot both edit the same file, even on disjoint line ranges, because neither sees the other's changes). Ignore parenthetical annotations like `(also rename to ...)`.
 
-**Then apply the concurrency cap**: if any dispatch group still contains more than 5 tasks after file-overlap serialization, split it into sub-groups of ≤5 by task ID ascending. Sub-groups execute sequentially. This keeps the "dispatch group" concept single-meaning: a dispatch group is always a set of ≤5 tasks with no file overlap that run in one assistant turn.
+**Then apply the concurrency cap**: if any dispatch group still contains more than 5 tasks after file-overlap serialization, split it into sub-groups of ≤5 by task ID ascending. Sub-groups execute sequentially. This keeps the "dispatch group" concept single-meaning: a dispatch group is always a set of ≤5 tasks with no file overlap that run in one assistant turn. Why 5: a higher cap risks the parent assistant turn aging out before all parallel returns aggregate, and gives diminishing parallelism returns once the typical task-DAG width is exceeded.
 
 The result is an ordered list of **dispatch groups** — groups execute one after another; within a group, all Task calls go in the same assistant turn.
 

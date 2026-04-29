@@ -78,8 +78,6 @@ See `references/template.md` for the template + Self-Review checklist, and `refe
 - **Every Acceptance bullet cites its source** in parens: `(PRD §Acceptance criteria)`, `(TRD §Interfaces & contracts)`, or `(request)`.
 - **Notes is for non-obvious constraints only.** Omit the field entirely otherwise.
 
-Task-writer-specific anti-patterns (additional to `../../harness-contracts/output-contract.md`): no implementation steps (the subagent decides); no bundling unrelated surfaces; no duplicated Acceptance bullets across tasks (each criterion lives in exactly one task — TRD Risks are the exception); no `(assumed)` on Acceptance (use Notes).
-
 ### Step 5 — Write the file
 
 Create `.planning/{session_id}/` if missing. Write `TASKS.md`. If the file already exists, emit `error`.
@@ -103,6 +101,15 @@ When this skill emits `outcome: "done"` (full payload contract: `../../harness-c
 
 On `outcome: "error"`: flow terminates. Report to the user and stop.
 
+## Anti-patterns
+
+Task-writer-specific (additional to those in `../../harness-contracts/output-contract.md`):
+
+- **No implementation steps.** The subagent decides how. The task says what surface to change and what passes acceptance.
+- **No bundling unrelated surfaces.** Two changes that touch different files for different reasons are two tasks.
+- **No duplicated Acceptance bullets across tasks.** Each criterion lives in exactly one task. TRD Risks are the documented exception — a Risk applies to multiple tasks, so it repeats in each affected task's Notes.
+- **No `(assumed)` tag on Acceptance.** If you must assume to write a criterion, the criterion belongs in Notes, not Acceptance — Acceptance is what the executor and evaluator hold the work to.
+
 ## Edge cases
 
 - **PRD Acceptance with no natural home task**: don't invent a dummy task. Add to the closest existing task with PRD citation. If genuinely no task touches the surface, leave the Self-Review box *unchecked* — a legitimate signal for the evaluator.
@@ -116,4 +123,4 @@ On `outcome: "error"`: flow terminates. Report to the user and stop.
 - File ownership: see `../../harness-contracts/file-ownership.md` (this skill = `TASKS.md` row — create only; PRD/TRD are upstream read-only; source code untouched). Note: parallel-task-executor will later append `[Result]` blocks to this file; do not pre-allocate them.
 - Do not invoke other agents or skills. Do not dispatch the executor — the 'Required next skill' section above dispatches downstream.
 - Do not modify source code, even if you spot bugs. Note them in Notes if load-bearing.
-- Tool budget: ~20 Read/Grep/Glob calls. If you need more, halt and emit `error` with a `reason`.
+- Tool budget: ~20 Read/Grep/Glob calls — sized between PRD's scope-locating ~15 and TRD's design-deep ~25. Task-writer needs to confirm files exist (Glob) and locate decomposition seams, but does not redo TRD's design work. If you need more, halt and emit `error` with a `reason`.

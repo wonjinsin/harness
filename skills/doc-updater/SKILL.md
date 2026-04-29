@@ -37,7 +37,7 @@ Single JSON object, no prose alongside.
 
 1. **Read context** — parse `tasks_path` (heading, Description, `[Result]` per task), run `diff_command`. Missing TASKS.md or empty diff → `error`.
 
-2. **CHANGELOG.md (unconditional)** — create with [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) skeleton if absent. Find `## [Unreleased]` (insert if missing). Classify each task into `Added` / `Changed` / `Fixed` / `Security` / `Deprecated` / `Removed`. Security-relevant diffs (auth, crypto, input validation, secrets, RBAC) double-emit under `Security`. Ambiguous → prefer `Added > Changed > Fixed`. One bullet per task: `- {imperative one-liner} (TASKS.md: task-{id})`.
+2. **CHANGELOG.md (unconditional)** — create with [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) skeleton if absent. Find `## [Unreleased]` (insert if missing). Classify each task into `Added` / `Changed` / `Fixed` / `Security` / `Deprecated` / `Removed`. Security-relevant diffs (auth, crypto, input validation, secrets, RBAC) double-emit under `Security`. Ambiguous → prefer `Added > Changed > Fixed` (broader category wins so the user-facing summary stays inclusive — a feature addition that incidentally fixes a regression reads better as Added than Fixed for the reader). One bullet per task: `- {imperative one-liner} (TASKS.md: task-{id})`.
 
 3. **README.md / CLAUDE.md / docs/\*\*/\*.md** — for each file that exists, identify sections semantically touched by the diff. Apply a small edit (≤20 lines): update existing section (with line number) or append new `## {heading}` at file end. If the diff demands a top-to-bottom rewrite, record as `not applied — structural rewrite required` and skip (≤20 lines keeps each doc edit reviewable as a single hunk; structural rewrites belong to a human, not silent chunking).
 
@@ -79,7 +79,7 @@ doc-updater is the terminal node — the harness flow ends here. Report a brief 
 - No user questions. Ambiguity → record in `## Not applied` and continue.
 - `not applied` never escalates to `error` — only unrecoverable infra failures do (permission denied, disk full, corrupted CHANGELOG).
 
-## Common Mistakes
+## Anti-patterns
 
 - **Translating README** — out of scope. README.ko.md or other locale variants belong to a human translator; record under `## Not applied` and continue.
 - **Version bumping** — out of scope. Version semantics are a release decision, not a doc-impact decision.

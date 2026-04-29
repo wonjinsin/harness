@@ -55,8 +55,6 @@ See `references/template.md` for the exact structure and `references/example.md`
 - Risks are specific: "rate limiter keyed by IP misses shared-NAT users" beats "may have security issues".
 - Tag assumptions in Open questions with `(assumed)`.
 
-TRD-specific anti-patterns (in addition to `../../harness-contracts/output-contract.md`): no step-by-step task lists (that's TASKS); no re-stating PRD acceptance criteria verbatim — reference them by section.
-
 ### Step 4 — Write the file
 
 Create `.planning/{session_id}/` if needed. Write `TRD.md`. If the file already exists, halt and emit `error` per `../../harness-contracts/output-contract.md`.
@@ -77,6 +75,13 @@ When this skill emits `outcome: "done"` (full payload contract: `../../harness-c
   Payload: `{ session_id, request, prd_path, trd_path, brainstorming_output }` — `trd_path` is constructed from this skill's `path`. `prd_path` may be `null` on the trd-only route.
 
 On `outcome: "error"`: flow terminates. Report to the user and stop.
+
+## Anti-patterns
+
+TRD-specific (additional to those in `../../harness-contracts/output-contract.md`):
+
+- **No step-by-step task lists.** Sequencing is task-writer's job. TRD describes the shape of the change; the steps to get there belong in TASKS.
+- **No re-stating PRD acceptance criteria verbatim.** Reference them by section (e.g., "see PRD §Acceptance criteria #2"). Duplicating invites drift, and the evaluator greps the original PRD vocabulary anyway.
 
 ## Edge cases
 

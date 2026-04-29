@@ -92,7 +92,7 @@ Paths are filesystem literals — match them the same in any language. Record hi
 
 Produce a single integer N — best-guess total of modified + newly created files.
 
-Calibration:
+Calibration (typical signals from completed projects of each shape — they are not bounds; precision is not the goal because file count alone never decides tier, it only nudges it):
 
 - Typo / format / comment-only → 1
 - Single-subsystem bug fix → 1–3
