@@ -1,6 +1,6 @@
 ---
 name: using-harness
-description: Loaded at session start as the meta-skill. Defines when to engage the harness chain (build/fix/refactor/migrate requests → invoke router as the first action; casual chat → reply inline without invoking) and how skill priority works (each skill's 'Required next skill' marker is load-bearing — follow it before any other skill the conversation might match). Points at `harness-contracts/` for the shared execution-modes, payload, and file-ownership contracts.
+description: Loaded at session start as the meta-skill. Mandates that every user turn begin by invoking `harness-flow:router` — router itself classifies casual / clarify / plan / resume, so the meta-skill never tries to short-circuit that decision. Defines the 'Required next skill' chain (each downstream skill names its successor) and points at `harness-contracts/` for the shared execution-modes, payload, and file-ownership contracts.
 model: haiku
 ---
 
@@ -8,10 +8,29 @@ model: haiku
 
 The harness is a chained planning + execution flow that turns a feature/bug request into PRD/TRD/TASKS, executes, evaluates, and updates docs. Each skill's SKILL.md declares its own next skill in a "Required next skill" section — follow those markers in order.
 
-## When to engage
+<SUBAGENT-STOP>
+If you were dispatched as a subagent to execute a specific task, skip this skill. The harness chain runs in the main context; subagents act on their dispatch prompt.
+</SUBAGENT-STOP>
 
-- **Casual chat / question** ("hi", "what does X mean?", "how do I…?") → answer directly. Do not invoke the harness.
-- **Build / fix / refactor / migrate request** ("add 2FA to login", "fix the broken test", "refactor session handling") → invoke `Skill("harness-flow:router")` as your first action. Router decides whether to clarify, plan, or resume.
+## Entry rule
+
+<EXTREMELY-IMPORTANT>
+**Every user turn — your first action MUST be `Skill("harness-flow:router")`.**
+
+Do not pre-classify the message yourself. Classifying casual / clarify / plan / resume is exactly what the router exists to do; skipping it is the single failure mode that causes the harness to silently disengage. Greetings, factual questions, "quick fixes," and meta-questions all enter through router — router replies inline when the verdict is `casual`, and emits a `## Status` for the chain otherwise.
+
+The only legitimate skip: another harness skill is already mid-flow and its `## Required next skill` section names a different next dispatch.
+</EXTREMELY-IMPORTANT>
+
+## Red flags — STOP if any of these cross your mind
+
+| Thought | Reality |
+|---------|---------|
+| "This is just a simple question, I'll answer inline." | The router decides what counts as casual. Invoke it. |
+| "This is just a quick fix, I'll edit the file directly." | Quick fixes still route through the harness. Invoke router. |
+| "Let me read a few files first to understand the request." | Orientation comes after routing. Invoke router first. |
+| "The user is mid-conversation, I don't need to re-route." | Every user turn re-enters at router unless another harness skill named a next skill. |
+| "I already know what to do here." | Knowing the answer ≠ skipping the chain. Invoke router. |
 
 ## Skill priority
 

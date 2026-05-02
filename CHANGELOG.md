@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project loosely tracks [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] — 2026-05-01
+
+### Changed
+
+- `skills/using-harness/SKILL.md` — meta-skill rewritten to mandate `Skill("harness-flow:router")` as the first action of every user turn, removing the prior LLM-side casual/build pre-classification that occasionally caused the harness to silently disengage. Router (which already handles `casual` inline) is now the single classifier. Adds `<SUBAGENT-STOP>` guard, `<EXTREMELY-IMPORTANT>` entry rule, and a 5-row Red Flags table covering the rationalizations that lead to skipping router. Korean mirror `design/skills/using-harness/SKILL.ko.md` updated in lockstep.
+
 ## [0.3.5] — 2026-05-01
 
 ### Added
