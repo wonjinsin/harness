@@ -1,4 +1,9 @@
-# harness-flow
+# harness-flow-custom
+
+> **DEPRECATED** — This repository contains experimental variants that diverged from expected behavior and is no longer actively maintained.
+> The canonical version has moved to **[wonjinsin/harness-flow](https://github.com/wonjinsin/harness-flow)**. Please use that repository instead.
+
+---
 
 A Claude Code plugin. Routes user requests through **router → brainstorming → PRD/TRD/TASKS → execute → evaluate → doc-update** as a Skill × Agent hybrid harness. There is no central DAG file — each skill declares its own next step inline (`## Required next skill`), and a session-start hook injects the `using-harness` meta-skill so the LLM acts as the interpreter.
 

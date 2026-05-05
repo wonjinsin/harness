@@ -10,7 +10,7 @@
   },
   "plugins": [
     {
-      "name": "harness-flow",
+      "name": "harness-flow-custom",
       "source": "./",
       "description": "Skill × Agent hybrid harness — router → brainstorming → PRD/TRD/TASKS → execute → evaluate → doc-update. DAG-driven, interpreted at runtime.",
       "version": "0.3.7",
