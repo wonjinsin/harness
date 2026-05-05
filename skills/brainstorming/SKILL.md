@@ -170,11 +170,11 @@ See `references/edge-cases.md` for pivot, casual reclassification, ambiguous ans
 
 The next skill depends on the `## Status` value of the terminal message (full per-edge handoff: `../../harness-contracts/payload-contract.md` § "brainstorming → \*"). All writer dispatches read `.planning/{session_id}/brainstorming.md` from disk — the dispatch prompt itself stays minimal.
 
-- `## Status: prd-trd` or `prd-only` → **REQUIRED SUB-SKILL:** Use harness-flow:prd-writer
+- `## Status: prd-trd` or `prd-only` → **REQUIRED SUB-SKILL:** Use harness-flow-custom:prd-writer
   Dispatch: `Task(prd-writer, prompt: "Draft PRD for session {id}. Read .planning/{id}/brainstorming.md.")`
-- `## Status: trd-only` → **REQUIRED SUB-SKILL:** Use harness-flow:trd-writer
+- `## Status: trd-only` → **REQUIRED SUB-SKILL:** Use harness-flow-custom:trd-writer
   Dispatch: `Task(trd-writer, prompt: "Draft TRD for session {id}. Read .planning/{id}/brainstorming.md. No PRD will exist for this route.")`
-- `## Status: tasks-only` → **REQUIRED SUB-SKILL:** Use harness-flow:task-writer
+- `## Status: tasks-only` → **REQUIRED SUB-SKILL:** Use harness-flow-custom:task-writer
   Dispatch: `Task(task-writer, prompt: "Draft TASKS for session {id}. Read .planning/{id}/brainstorming.md. No PRD or TRD will exist for this route.")`
 - `## Status: pivot` or `exit-casual` → flow terminates. No file written. Report to the user and stop.
 

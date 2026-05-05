@@ -1,4 +1,4 @@
-# harness-flow
+# harness-flow-custom
 
 Claude Code 플러그인. 유저 요청을 **router → brainstorming → PRD/TRD/TASKS → execute → evaluate → doc-update** 순으로 흘리는 Skill × Agent 하이브리드 하네스. 중앙 DAG 파일은 없다 — 각 스킬이 자기 본문에 다음 단계 (`## Required next skill`) 를 직접 선언하고, SessionStart 훅이 `using-harness` 메타 스킬을 컨텍스트에 주입해서 LLM 자체가 인터프리터로 동작한다.
 
@@ -27,8 +27,8 @@ Claude Code 플러그인. 유저 요청을 **router → brainstorming → PRD/TR
 이 repo 가 자기 자신을 단일 플러그인 마켓플레이스로 노출한다 (`.claude-plugin/marketplace.json`).
 
 ```
-/plugin marketplace add wonjinsin/harness-flow
-/plugin install harness-flow@harness
+/plugin marketplace add wonjinsin/harness-flow-custom
+/plugin install harness-flow-custom@harness
 ```
 
 이후 새 세션에서 SessionStart 훅이 자동으로 돌아 `using-harness` 스킬이 컨텍스트에 주입된다.
@@ -37,16 +37,16 @@ Claude Code 플러그인. 유저 요청을 **router → brainstorming → PRD/TR
 
 플러그인 시스템을 거치지 않고 repo 를 통째로 `.claude/` 아래 두고 싶을 때. 이 모드에선 Claude Code 가 `$CLAUDE_PLUGIN_ROOT` 를 주입하지 않지만, `session-start.sh` 가 자기 위치에서 루트를 자동 유도하므로 **별도 환경 변수 설정 불필요**.
 
-**(B-1) 글로벌 — `~/.claude/harness-flow/` 에 통째로 배치 (권장)**
+**(B-1) 글로벌 — `~/.claude/harness-flow-custom/` 에 통째로 배치 (권장)**
 
 ```bash
-git clone https://github.com/wonjinsin/harness.git ~/.claude/harness-flow
+git clone https://github.com/wonjinsin/harness.git ~/.claude/harness-flow-custom
 ```
 
-**(B-2) 프로젝트 로컬 — `<project>/.claude/harness-flow/`**
+**(B-2) 프로젝트 로컬 — `<project>/.claude/harness-flow-custom/`**
 
 ```bash
-git clone https://github.com/wonjinsin/harness.git <project>/.claude/harness-flow
+git clone https://github.com/wonjinsin/harness.git <project>/.claude/harness-flow-custom
 ```
 
 #### 필수 — settings.json 에 훅 등록
@@ -64,7 +64,7 @@ git clone https://github.com/wonjinsin/harness.git <project>/.claude/harness-flo
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME/.claude/harness-flow/hooks/session-start.sh\""
+            "command": "bash \"$HOME/.claude/harness-flow-custom/hooks/session-start.sh\""
           }
         ]
       }
@@ -84,7 +84,7 @@ git clone https://github.com/wonjinsin/harness.git <project>/.claude/harness-flo
         "hooks": [
           {
             "type": "command",
-            "command": "bash \".claude/harness-flow/hooks/session-start.sh\""
+            "command": "bash \".claude/harness-flow-custom/hooks/session-start.sh\""
           }
         ]
       }
@@ -112,7 +112,7 @@ HARNESS_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$SCRIPT_DIR")}"
 /plugin
 ```
 
-목록에 `harness-flow` 가 enabled 로 보이면 플러그인 모드 정상. 복붙 모드면 `/plugin` 에는 안 뜨지만, 새 세션 첫 메시지 시점에 시스템 컨텍스트 상단에 `"You have harness."` 블록과 `using-harness` 본문이 보이면 부트스트랩 성공.
+목록에 `harness-flow-custom` 가 enabled 로 보이면 플러그인 모드 정상. 복붙 모드면 `/plugin` 에는 안 뜨지만, 새 세션 첫 메시지 시점에 시스템 컨텍스트 상단에 `"You have harness."` 블록과 `using-harness` 본문이 보이면 부트스트랩 성공.
 
 ---
 

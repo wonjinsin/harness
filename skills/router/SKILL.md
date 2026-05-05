@@ -239,7 +239,7 @@ resume
 
 The next skill depends on `## Status` (full handoff contract: `../../harness-contracts/payload-contract.md` § "router → brainstorming"):
 
-- `## Status: clarify | plan | resume` → **REQUIRED SUB-SKILL:** Use harness-flow:brainstorming
+- `## Status: clarify | plan | resume` → **REQUIRED SUB-SKILL:** Use harness-flow-custom:brainstorming
   Dispatch (main context — Skill, not Task): `Skill(brainstorming, args: "session_id={id} request={text} route={status} resume={true|false}")`. The route arg carries the router's `## Status` value verbatim; `resume=true` only when status is `resume`.
 - `## Status` absent (casual) → no headers emitted; flow does not engage. Reply directly to the user and stop.
 

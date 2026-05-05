@@ -234,7 +234,7 @@ resume
 
 다음 스킬은 `## Status` 에 따라 결정됨 (전체 핸드오프 계약: `../../harness-contracts/payload-contract.ko.md` § "router → brainstorming"):
 
-- `## Status: clarify | plan | resume` → **필수 하위 스킬:** harness-flow:brainstorming 사용
+- `## Status: clarify | plan | resume` → **필수 하위 스킬:** harness-flow-custom:brainstorming 사용
   디스패치 (메인 컨텍스트 — Skill, Task 아님): `Skill(brainstorming, args: "session_id={id} request={text} route={status} resume={true|false}")`. `route` 인자는 router 의 `## Status` 값을 그대로 전달; `resume=true` 는 status 가 `resume` 일 때만.
 - `## Status` 부재 (casual) → 헤더 emit 없음; 흐름 미진입. 사용자에게 직접 답변하고 종료.
 

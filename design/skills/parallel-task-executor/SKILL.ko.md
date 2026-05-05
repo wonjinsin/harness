@@ -96,7 +96,7 @@ done
 
 이 스킬이 `## Status: done` 을 emit 할 때 (전체 핸드오프 계약: `../../harness-contracts/payload-contract.ko.md` § "parallel-task-executor → evaluator"):
 
-- **필수 하위 스킬:** harness-flow:evaluator 사용
+- **필수 하위 스킬:** harness-flow-custom:evaluator 사용
   디스패치 (subagent — Task, Skill 아님): `Task(evaluator, prompt: "Evaluate session {session_id}. Read .planning/{session_id}/TASKS.md and the diff.")` — evaluator 는 `TASKS.md` 를 결정론적으로 읽고 기본으로 `git diff HEAD` 를 실행한다. 메인 스레드의 `rules_dir` / `diff_command` 오버라이드는 프롬프트에 일반 라인으로 덧붙일 수 있다.
 
 `## Status: blocked | failed | error` 일 때: 흐름 종료. 실패 디테일(터미널 메시지의 `## Reason` 라인)을 사용자에게 보고하고 멈춘다. (non-done status 에서는 evaluator 가 돌지 않는다 — blocker 해소는 사람의 결정.)

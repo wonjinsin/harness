@@ -96,7 +96,7 @@ The `## Tasks` block lists every task ID with its terminal `Status:` value (or `
 
 When this skill emits `## Status: done` (full handoff contract: `../../harness-contracts/payload-contract.md` § "parallel-task-executor → evaluator"):
 
-- **REQUIRED SUB-SKILL:** Use harness-flow:evaluator
+- **REQUIRED SUB-SKILL:** Use harness-flow-custom:evaluator
   Dispatch (subagent — Task, not Skill): `Task(evaluator, prompt: "Evaluate session {session_id}. Read .planning/{session_id}/TASKS.md and the diff.")` — the evaluator reads `TASKS.md` deterministically and runs `git diff HEAD` by default; main-thread overrides for `rules_dir` / `diff_command` may be appended to the prompt as plain lines.
 
 On `## Status: blocked | failed | error`: flow terminates. Report the failure detail (the `## Reason` line from the terminal message) to the user and stop. Evaluator does not run on a non-done status — fixing blockers is a human decision.

@@ -244,7 +244,7 @@ The same shape applies when the source is `Status: failed` — only the `## Reas
 
 When this skill emits `## Status: pass` (full handoff contract: `../../harness-contracts/payload-contract.md` § "evaluator → doc-updater"):
 
-- **REQUIRED SUB-SKILL:** Use harness-flow:doc-updater
+- **REQUIRED SUB-SKILL:** Use harness-flow-custom:doc-updater
   Dispatch (subagent — Task, not Skill): `Task(doc-updater, prompt: "Reflect session {session_id} into docs. Read .planning/{session_id}/TASKS.md.")` — main-thread overrides for `diff_command` may be appended to the prompt as plain lines.
 
 On `## Status: escalate` or `## Status: error`: flow terminates. Report the verdict to the user (with the `## Reason` line and any rule violations) and stop. Doc updates are gated on a passing evaluation — never auto-emit on escalate.

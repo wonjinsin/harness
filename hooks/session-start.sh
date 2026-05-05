@@ -3,7 +3,7 @@
 #
 # Two modes supported:
 #   1. Plugin mode      — Claude Code injects $CLAUDE_PLUGIN_ROOT.
-#   2. Copy-paste mode  — repo lives anywhere (e.g. ~/.claude/harness-flow/);
+#   2. Copy-paste mode  — repo lives anywhere (e.g. ~/.claude/harness-flow-custom/);
 #                          we derive the root from this script's own location.
 
 set -euo pipefail

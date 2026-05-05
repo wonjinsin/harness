@@ -1,7 +1,7 @@
 # harness-flow-custom
 
 > **DEPRECATED** — This repository contains experimental variants that diverged from expected behavior and is no longer actively maintained.
-> The canonical version has moved to **[wonjinsin/harness-flow](https://github.com/wonjinsin/harness-flow)**. Please use that repository instead.
+> The canonical version has moved to **[wonjinsin/harness-flow-custom](https://github.com/wonjinsin/harness-flow-custom)**. Please use that repository instead.
 
 ---
 
@@ -32,8 +32,8 @@ A Claude Code plugin. Routes user requests through **router → brainstorming �
 This repo exposes itself as a single-plugin marketplace via `.claude-plugin/marketplace.json`.
 
 ```
-/plugin marketplace add wonjinsin/harness-flow
-/plugin install harness-flow@harness
+/plugin marketplace add wonjinsin/harness-flow-custom
+/plugin install harness-flow-custom@harness
 ```
 
 The `SessionStart` hook bundled with the plugin will run on every new session and inject `using-harness` into context.
@@ -42,16 +42,16 @@ The `SessionStart` hook bundled with the plugin will run on every new session an
 
 Use this when you want to bypass the plugin system and place the repo directly under `.claude/`. Claude Code will not inject `$CLAUDE_PLUGIN_ROOT` in this mode, but `session-start.sh` self-derives the harness root from its own location, so **no environment variable needs to be exported**.
 
-**(B-1) Global — clone into `~/.claude/harness-flow/` (recommended)**
+**(B-1) Global — clone into `~/.claude/harness-flow-custom/` (recommended)**
 
 ```bash
-git clone https://github.com/wonjinsin/harness.git ~/.claude/harness-flow
+git clone https://github.com/wonjinsin/harness.git ~/.claude/harness-flow-custom
 ```
 
-**(B-2) Project-local — `<project>/.claude/harness-flow/`**
+**(B-2) Project-local — `<project>/.claude/harness-flow-custom/`**
 
 ```bash
-git clone https://github.com/wonjinsin/harness.git <project>/.claude/harness-flow
+git clone https://github.com/wonjinsin/harness.git <project>/.claude/harness-flow-custom
 ```
 
 #### Required: register the hook in `settings.json`
@@ -69,7 +69,7 @@ Global (`~/.claude/settings.json`):
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME/.claude/harness-flow/hooks/session-start.sh\""
+            "command": "bash \"$HOME/.claude/harness-flow-custom/hooks/session-start.sh\""
           }
         ]
       }
@@ -89,7 +89,7 @@ Project-local (`<project>/.claude/settings.json`) — use a relative path from t
         "hooks": [
           {
             "type": "command",
-            "command": "bash \".claude/harness-flow/hooks/session-start.sh\""
+            "command": "bash \".claude/harness-flow-custom/hooks/session-start.sh\""
           }
         ]
       }
@@ -117,7 +117,7 @@ Splitting `skills/`, `agents/`, `hooks/` out and merging them into the existing 
 /plugin
 ```
 
-If `harness-flow` shows up as enabled, plugin mode is working. In copy-paste mode `/plugin` will not list anything, but on the first message of a new session the system context should contain a `"You have harness."` block with the body of `using-harness` — that is the bootstrap success signal.
+If `harness-flow-custom` shows up as enabled, plugin mode is working. In copy-paste mode `/plugin` will not list anything, but on the first message of a new session the system context should contain a `"You have harness."` block with the body of `using-harness` — that is the bootstrap success signal.
 
 ---
 

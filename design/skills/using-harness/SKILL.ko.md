@@ -1,6 +1,6 @@
 ---
 name: using-harness
-description: 세션 시작 시 메타 스킬로 로드. 모든 유저 턴은 `harness-flow:router` invoke 로 시작 필수 — casual / clarify / plan / resume 분류는 router 자체가 함. 메타 스킬이 사전 분류로 단축경로를 만들지 않음. 'Required next skill' 체인 (각 스킬이 다음을 지정) 을 정의하고 공유 execution-modes / payload / file-ownership 계약은 `harness-contracts/` 를 가리킴.
+description: 세션 시작 시 메타 스킬로 로드. 모든 유저 턴은 `harness-flow-custom:router` invoke 로 시작 필수 — casual / clarify / plan / resume 분류는 router 자체가 함. 메타 스킬이 사전 분류로 단축경로를 만들지 않음. 'Required next skill' 체인 (각 스킬이 다음을 지정) 을 정의하고 공유 execution-modes / payload / file-ownership 계약은 `harness-contracts/` 를 가리킴.
 model: haiku
 ---
 
@@ -15,7 +15,7 @@ harness 는 feature/bug 요청을 PRD/TRD/TASKS 로 만들고, 실행하고, 검
 ## Entry rule (진입 규칙)
 
 <EXTREMELY-IMPORTANT>
-**모든 유저 턴 — 첫 액션은 반드시 `Skill("harness-flow:router")`.**
+**모든 유저 턴 — 첫 액션은 반드시 `Skill("harness-flow-custom:router")`.**
 
 메시지를 직접 사전 분류하지 마. casual / clarify / plan / resume 분류는 router 가 하라고 만들어진 일이고, 메타 스킬에서 단축경로를 만드는 것이 harness 가 조용히 disengage 되는 단일 실패 모드. 인사말, 단순 질문, "간단한 수정," 메타 질문 모두 router 로 들어감 — router 가 `casual` 로 판정하면 인라인 응답하고 끝, 그 외에는 `## Status` 를 emit 해 체인이 이어짐.
 

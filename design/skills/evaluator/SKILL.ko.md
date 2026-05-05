@@ -244,7 +244,7 @@ task-4: Acceptance bullet 2 contradicts bullet 4
 
 이 스킬이 `## Status: pass` 를 emit 할 때 (전체 핸드오프 계약: `../../harness-contracts/payload-contract.ko.md` § "evaluator → doc-updater"):
 
-- **필수 하위 스킬:** harness-flow:doc-updater 사용
+- **필수 하위 스킬:** harness-flow-custom:doc-updater 사용
   디스패치 (subagent — Task, Skill 아님): `Task(doc-updater, prompt: "Reflect session {session_id} into docs. Read .planning/{session_id}/TASKS.md.")` — 메인 스레드의 `diff_command` 오버라이드는 프롬프트에 일반 라인으로 덧붙일 수 있다.
 
 `## Status: escalate` 또는 `## Status: error` 일 때: 플로우 종료. 유저에게 판정 (`## Reason` 라인과 규칙 위반 사항 포함) 을 보고하고 멈춘다. 문서 업데이트는 통과한 평가에 게이팅됨 — escalate 시 절대 자동 emit 하지 않는다.

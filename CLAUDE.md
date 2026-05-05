@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-`harness-flow` is a Claude Code plugin (v0.3.4). It is entirely markdown — no build step, no test runner, no package manager. The operative content is in `skills/` and `harness-contracts/`. Everything else is documentation or plugin metadata.
+`harness-flow-custom` is a Claude Code plugin (v0.3.4). It is entirely markdown — no build step, no test runner, no package manager. The operative content is in `skills/` and `harness-contracts/`. Everything else is documentation or plugin metadata.
 
 ## File layout
 
@@ -22,7 +22,7 @@ hooks/              SessionStart hook (session-start.sh) that injects using-harn
 
 1. **Edit** — modify files under `skills/` or `harness-contracts/`
 2. **Reflect** — update the matching `design/*.ko.md` Korean mirror
-3. **Test** — either bump version + reinstall, or copy edits directly to `~/.claude/plugins/cache/harness/harness-flow/<version>/` for quick iteration
+3. **Test** — either bump version + reinstall, or copy edits directly to `~/.claude/plugins/cache/harness/harness-flow-custom/<version>/` for quick iteration
 4. **Version** — bump version in both `plugin.json` and `marketplace.json`, add entry to `CHANGELOG.md`
 
 ## Architecture
@@ -65,6 +65,6 @@ Log every change in `CHANGELOG.md` under a new `## [x.y.z]` header.
 
 **Version drift.** The version mentioned in the `## What this repo is` section header comment must match `plugin.json`. If they diverge, the installed plugin version is the source of truth.
 
-**Testing skill changes.** Skills are read from the installed plugin cache at `~/.claude/plugins/cache/harness/harness-flow/<version>/`. After editing files in this repo, either bump the version and reinstall, or edit the cached copy directly for quick iteration. There is no `npm test` — manual end-to-end testing via a real session is the only verification.
+**Testing skill changes.** Skills are read from the installed plugin cache at `~/.claude/plugins/cache/harness/harness-flow-custom/<version>/`. After editing files in this repo, either bump the version and reinstall, or edit the cached copy directly for quick iteration. There is no `npm test` — manual end-to-end testing via a real session is the only verification.
 
 **`design/` sync is not automated.** When editing any English file under `skills/` or `harness-contracts/`, manually update the matching `.ko.md` in `design/`. There is no lint or CI to catch drift.

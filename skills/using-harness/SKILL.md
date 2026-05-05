@@ -1,6 +1,6 @@
 ---
 name: using-harness
-description: Loaded at session start as the meta-skill. Mandates that every user turn begin by invoking `harness-flow:router` — router itself classifies casual / clarify / plan / resume, so the meta-skill never tries to short-circuit that decision. Defines the 'Required next skill' chain (each downstream skill names its successor) and points at `harness-contracts/` for the shared execution-modes, payload, and file-ownership contracts.
+description: Loaded at session start as the meta-skill. Mandates that every user turn begin by invoking `harness-flow-custom:router` — router itself classifies casual / clarify / plan / resume, so the meta-skill never tries to short-circuit that decision. Defines the 'Required next skill' chain (each downstream skill names its successor) and points at `harness-contracts/` for the shared execution-modes, payload, and file-ownership contracts.
 model: haiku
 ---
 
@@ -15,7 +15,7 @@ If you were dispatched as a subagent to execute a specific task, skip this skill
 ## Entry rule
 
 <EXTREMELY-IMPORTANT>
-**Every user turn — your first action MUST be `Skill("harness-flow:router")`.**
+**Every user turn — your first action MUST be `Skill("harness-flow-custom:router")`.**
 
 Do not pre-classify the message yourself. Classifying casual / clarify / plan / resume is exactly what the router exists to do; skipping it is the single failure mode that causes the harness to silently disengage. Greetings, factual questions, "quick fixes," and meta-questions all enter through router — router replies inline when the verdict is `casual`, and emits a `## Status` for the chain otherwise.
 
